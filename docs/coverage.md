@@ -1,7 +1,46 @@
 # Coverage
 
+What the local corpus contains, what it does not, and how to check your own
+database against the reference snapshot. Read this when you need to know
+whether a provision, historical version, or judgment is likely to be
+retrievable.
+
+[Documentation index](README.md) · On this page:
+[At a glance](#at-a-glance) · [Check your corpus](#check-your-corpus) ·
+[Corpus counts](#corpus-counts) ·
+[Historical counts](#historical-corpus-counts-english-past-version-archives) ·
+[Core criminal law](#core-criminal-law-and-procedure) · [Scope](#scope) ·
+[Historical legislation](#historical-legislation) · [Case law](#case-law) ·
+[Recommended coverage](#recommended-coverage-for-a-criminal-practice)
+
+## At a glance
+
+| Question | Answer |
+|---|---|
+| Current legislation | Indexed locally in English and Traditional Chinese. |
+| Historical legislation | Indexed when the official Past Version archives are downloaded and ingested. |
+| Judgments | Fetched on demand from HKLII and cached; coverage grows with use. |
+| Citator | No. Note-up and authority ranking are research aids, not a citator of record. |
+
 Snapshot: **2026-11-15** (current-version archives plus the English Past
 Version archives downloaded that day).
+
+## Check your corpus
+
+Make sure `HK_LAW_DB` points to the corpus you built; otherwise `stats` reports
+a different (possibly empty) database. Run `.venv/bin/hk-law stats` and read
+these fields:
+
+| Field | What it tells you |
+|---|---|
+| `legislation_docs` / `legislation_sections` | Current-corpus size, all languages. |
+| `legislation_sections_en` / `legislation_sections_zh` | Current English and Chinese coverage. |
+| `legislation_history_docs` / `legislation_history_sections` | Historical coverage, if the Past Version archives were ingested. |
+| `legislation_history_date_range` | Earliest and latest historical version dates available. |
+| `last_legislation_ingest` / `last_history_ingest` / `last_case_fetch` | Freshness. |
+
+Exact counts depend on the archives you ingested. The counts below are the
+reference snapshot, not a guarantee.
 
 ## Corpus counts
 
@@ -56,7 +95,9 @@ Version dates come from the `dc:date` metadata of each XML document. They are
 the date of the current consolidated version, not the date of the original
 enactment.
 
-## Included
+## Scope
+
+### Included
 
 - Ordinances and subsidiary legislation in the current-version XML archives.
 - Historical versions from the official Past Version archives when downloaded
@@ -67,7 +108,7 @@ enactment.
 - Source notes are stored separately from the operative text.
 - Point-in-time lookup with `statute_history(cap, section, as_of)`.
 
-## Not included
+### Not included
 
 - Historical versions for ranges/languages whose past archives were not
   ingested.
@@ -130,3 +171,9 @@ Judiciary/HKLII terms do not permit redistribution here.
 
 Use `list_ordinances` and `search_legislation` to confirm that a provision is
 in the corpus before relying on it.
+
+## Related
+
+[Architecture](architecture.md) · [Reliability model](reliability.md) ·
+[Data sources and licensing](data-sources-and-licensing.md) ·
+[Documentation index](README.md)

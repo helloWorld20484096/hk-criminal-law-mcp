@@ -1,30 +1,63 @@
 # Reliability model
 
-Legal research fails in predictable ways. This document lists the failure modes
-the project is designed to catch and the controls it uses.
+How the project catches the predictable ways legal research fails, and what to
+do before relying on a citation. Read this when you are drafting a research
+note, checking a citation, or changing verification behaviour.
+
+[Documentation index](README.md) · On this page:
+[Quick verification path](#quick-verification-path) ·
+[Failure modes](#failure-modes) · [Controls](#controls) ·
+[Confidence levels](#confidence-levels) · [Audit procedure](#audit-procedure) ·
+[Known limitations](#known-limitations)
+
+## Quick verification path
+
+Before relying on a passage:
+
+```bash
+# 1. Verify every citation.
+.venv/bin/hk-law verify-text \
+  "Cap. 221 s.9J; [2021] HKCFA 1"
+
+# 2. Read the provision.
+.venv/bin/hk-law get-section 221 9J
+
+# 3. Read the cited paragraph.
+.venv/bin/hk-law get-case \
+  "[2021] HKCFA 1" --paragraphs 1 2
+
+# 4. Check later treatment
+#    (not a citator).
+.venv/bin/hk-law note-up "[2021] HKCFA 1"
+```
+
+`verify_citations` — run as `hk-law verify-text` — checks the local cache by
+default; use `--live` to fetch uncached judgments from HKLII. A verified
+citation exists in the corpus, but that does not establish that it supports
+the proposition.
 
 ## Failure modes
 
-| Failure | Example | Control |
-|---|---|---|
-| Hallucinated citation | "Cap. 221 s.99ZZ" | `verify_citation` / `get_section` returns `not_found` |
-| Wrong section/heading | citing s.9J for a different bail rule | `get_section` returns the heading and operative text |
-| Stale law | relying on a repealed or amended provision | current-version corpus + `version_date`; repealed sections skipped |
-| Wrong paragraph | attributing a holding to the wrong paragraph | `get_case_paragraphs` returns numbered paragraphs |
-| Overruled authority | citing a case later reversed | `note_up` + explicit warning; human check required |
-| Secondary-source contamination | blog/news summary | only primary legislation/judgments are indexed |
-| Silent retrieval failure | HKLII changes its endpoint | error surfaced, not converted into a fake answer |
-| Language mismatch | English citation for a Chinese-only text | language field + `lang` parameter |
-| Overbroad search | keyword hit without legal relevance | snippet + full-text retrieval + analysis step |
-| Version drift | new amendment after download | `version_date` + re-download/ingest procedure |
-| Current text passed off as historical | using today's s.9J for a 2020 offence | `statute_history` returns `historical: false` with a warning when no past version is ingested |
-| Missed citation in a passage | only checking the first citation | `verify_citations` extracts and checks every citation in the text |
-| Invented sentencing number | quoting a tariff without a source | `sentencing_research` extracts penalty text and labels the result "not a tariff" |
-| Authority rank mistaken for citator | treating a high score as binding treatment | explicit warning; check note-up and the judgment |
+| Failure and example | Control |
+|---|---|
+| **Hallucinated citation** — "Cap. 221 s.99ZZ" | `verify_citation` / `get_section` returns `not_found` |
+| **Wrong section/heading** — citing s.9J for a different bail rule | `get_section` returns the heading and operative text |
+| **Stale law** — relying on a repealed or amended provision | current-version corpus + `version_date`; repealed sections skipped |
+| **Wrong paragraph** — attributing a holding to the wrong paragraph | `get_case_paragraphs` returns numbered paragraphs |
+| **Overruled authority** — citing a case later reversed | `note_up` + explicit warning; human check required |
+| **Secondary-source contamination** — blog/news summary | only primary legislation/judgments are indexed |
+| **Silent retrieval failure** — HKLII changes its endpoint | error surfaced, not converted into a fake answer |
+| **Language mismatch** — English citation for a Chinese-only text | language field + `lang` parameter |
+| **Overbroad search** — keyword hit without legal relevance | snippet + full-text retrieval + analysis step |
+| **Version drift** — new amendment after download | `version_date` + re-download/ingest procedure |
+| **Current text passed off as historical** — using today's s.9J for a 2020 offence | `statute_history` returns `historical: false` with a warning when no past version is ingested |
+| **Missed citation in a passage** — only checking the first citation | `verify_citations` extracts and checks every citation in the text |
+| **Invented sentencing number** — quoting a tariff without a source | `sentencing_research` extracts penalty text and labels the result "not a tariff" |
+| **Authority rank mistaken for citator** — treating a high score as binding treatment | explicit warning; check note-up and the judgment |
 
 ## Controls
 
-### 1. Citation verification
+### Citation verification
 
 `verify_citation` accepts:
 
@@ -41,7 +74,7 @@ HKLII when `live=True`.
 passage, deduplicates them, and reports a summary. It is the preferred control
 for draft submissions and research memos.
 
-### 2. Provenance on every result
+### Provenance on every result
 
 Each legislation result carries:
 
@@ -61,18 +94,18 @@ Each judgment result carries:
 - fetch date and cache status;
 - numbered paragraphs.
 
-### 3. Paragraph-level citations
+### Paragraph-level citations
 
 `get_case_paragraphs` extracts `<a class="para">` anchors from the judgment
 HTML. The returned paragraph number is the number in the judgment, not a
 position in the local text. Use it in submissions as `[2021] HKCFA 1 at [3]`.
 
-### 4. Explicit uncertainty
+### Explicit uncertainty
 
 Skills require `[UNVERIFIED]` markers when a source cannot be retrieved. A
 search snippet or a secondary source cannot be promoted to authority.
 
-### 5. Currency and treatment
+### Currency and treatment
 
 - Current legislation: `version_date` from the XML.
 - Historical legislation: `statute_history` returns the latest official version
@@ -84,13 +117,13 @@ search snippet or a secondary source cannot be promoted to authority.
 - `authority_ranking` is a court-level/cached-note-up heuristic, not a citator.
 - The tool never claims to be a citator of record.
 
-### 6. Section ranges
+### Section ranges
 
 `get_section_range` orders sections by number/letter (9, 9A, 9J, 10) and returns
 part/division context. Parts and Orders can restart numbering; the tool warns
 and returns all matches rather than guessing which one the user meant.
 
-### 7. Tests
+### Tests
 
 `tests/` covers:
 
@@ -108,12 +141,11 @@ Run `.venv/bin/pytest -q`.
 
 Use these in research outputs:
 
-- **High:** operative text retrieved from the local corpus; binding authority
-  retrieved by paragraph; no contrary authority found; currency checked.
-- **Medium:** text retrieved but authority is persuasive/first-instance, or
-  subsequent treatment not fully checked.
-- **Low:** only a search snippet is available, or the source could not be
-  retrieved; label `[UNVERIFIED]` and do not present as settled.
+| Level | Meaning |
+|---|---|
+| **High** | Operative text retrieved from the local corpus; binding authority retrieved by paragraph; no contrary authority found; currency checked. |
+| **Medium** | Text retrieved but authority is persuasive/first-instance, or subsequent treatment not fully checked. |
+| **Low** | Only a search snippet is available, or the source could not be retrieved; label `[UNVERIFIED]` and do not present as settled. |
 
 ## Audit procedure
 
@@ -136,3 +168,11 @@ Use these in research outputs:
   database.
 - The skills are practice scaffolds, not legal advice or a substitute for
   supervised legal work.
+
+See [Coverage](coverage.md) for what is indexed and what is missing.
+
+## Related
+
+[Architecture](architecture.md) · [Coverage](coverage.md) ·
+[Data sources and licensing](data-sources-and-licensing.md) ·
+[Documentation index](README.md)

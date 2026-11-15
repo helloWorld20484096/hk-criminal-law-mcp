@@ -6,10 +6,17 @@ defence**. It indexes the official current-version Hong Kong legislation XML
 HKLII on demand, and exposes the corpus to Claude Code (or any MCP client)
 through a small set of citation-aware tools.
 
+Python 3.11+ · Apache-2.0 code · CC BY 4.0 skills/docs · v0.2.0
+
+> [!WARNING]
 > **Not legal advice.** This is a research aid. Every provision and judgment
 > must be checked against the official source before it is relied on. Hong Kong
 > criminal law changes; check commencement, amendments and subsequent judicial
 > treatment.
+
+**Start here:** [Quick start](#quick-start) ·
+[Use with Claude Code](#use-with-claude-code) · [CLI](#use-from-the-cli) ·
+[MCP tools](#mcp-tools) · [All documentation](docs/README.md)
 
 ## Why this exists
 
@@ -47,59 +54,35 @@ official Past Version archives; if they have not been ingested,
 `statute_history` returns the current text with an explicit warning rather than
 pretending it is historical. The reference snapshot also includes **15,438
 English historical versions / 851,431 sections** (1997–2026); see
-`docs/coverage.md`.
+[docs/coverage.md](docs/coverage.md).
 
 ## Architecture
 
-```
-DATA.GOV.HK (DoJ e-Legislation XML: current + past versions)
-        │  download + parse
-        ▼
-   SQLite (data/hk_law.db)
-   ├── legislation_docs / legislation_sections
-   ├── legislation_history_docs / legislation_history_sections
-   ├── legislation_fts_en / legislation_fts_zh
-   ├── cases / case_paragraphs
-   └── cases_fts_en / cases_fts_zh
-        ▲
-        │  MCP tools (stdio)
-        │
-   hk-criminal-law MCP  ──►  Claude Code / any MCP client
-        │
-        └── HKLII JSON endpoints (judgments, search, note-up) ──► local cache
-```
+| Layer | What it does |
+|---|---|
+| Source | DATA.GOV.HK e-Legislation XML: current and Past Version archives |
+| Local corpus | SQLite at `data/hk_law.db`: current legislation + FTS, historical legislation, cached judgments + FTS |
+| Interfaces | `hk-criminal-law` MCP server (stdio) and `hk-law` CLI |
+| Live retrieval | HKLII JSON endpoints for judgments, search, and note-up; results cached locally |
 
 The MCP server has no cloud dependency. Network access is only needed to
 download legislation or fetch a judgment that is not already cached.
+
+For module-level detail, see [docs/architecture.md](docs/architecture.md).
 
 ## Quick start
 
 Requires Python 3.11+ and network access to DATA.GOV.HK for the initial
 download.
 
+### Install
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-
-# Official current-version legislation (English + Traditional Chinese).
-# This downloads roughly 1.3 GB of ZIPs and indexes ~120k sections.
-.venv/bin/hk-law download --data-dir data/raw --dataset current
-.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language en
-.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language zh-Hant
-
-# Optional: official past versions for point-in-time statute_history.
-# English past archives are roughly 2.1 GB.
-.venv/bin/hk-law download --data-dir data/raw --dataset past --languages en
-.venv/bin/hk-law ingest --data-dir data/raw --dataset past --language en
-
-.venv/bin/hk-law stats
 ```
 
-If you already have archives, point `ingest` at them:
-
-```bash
-.venv/bin/hk-law ingest --zip data/raw/hkel_c_leg_cap_1_cap_300_en.zip --language en
-```
+After installing, choose one corpus path.
 
 ### Prebuilt corpus (release assets)
 
@@ -116,20 +99,85 @@ export HK_LAW_DB="$PWD/hk_law_public.db"
 .venv/bin/hk-law stats
 ```
 
+The `HK_LAW_DB` export applies to the current shell. Launch Claude Code from
+this shell, or set the same variable in your environment, so the project-scoped
+server reads this database.
+
 The release database is built from the current-version e-Legislation XML as at
 2026-11-15. It contains no judgments, consistent with the source-data terms
-described in `docs/data-sources-and-licensing.md`. It is current-version only;
-for point-in-time text, download the Past Version archives and ingest them into
-the same database:
+described in [docs/data-sources-and-licensing.md](docs/data-sources-and-licensing.md).
+It is current-version only; for point-in-time text, see
+[Optional: historical versions](#optional-historical-versions).
+
+### Build from official archives
+
+Use this path if you need to build the corpus yourself or ingest a different
+range or language. The download is roughly 1.3 GB of ZIPs and indexes about
+120,000 sections.
+
+```bash
+# Keep the CLI and the project launcher on the same database.
+export HK_LAW_DB="$PWD/data/hk_law.db"
+
+# Official current-version legislation (English + Traditional Chinese).
+.venv/bin/hk-law download --data-dir data/raw --dataset current
+.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language en
+.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language zh-Hant
+```
+
+If you already have archives, point `ingest` at them:
+
+```bash
+.venv/bin/hk-law ingest --zip data/raw/hkel_c_leg_cap_1_cap_300_en.zip --language en
+```
+
+For point-in-time text, see
+[Optional: historical versions](#optional-historical-versions).
+
+### Check it worked
+
+Make sure `HK_LAW_DB` points to the corpus you built. The commands above set it
+for the current shell; set it again if you open a new one.
+
+```bash
+.venv/bin/hk-law stats
+```
+
+`stats` reports document and section counts, the database path, and the last
+ingest/fetch times. Check that the language(s) you ingested report non-zero
+counts (`legislation_sections_en` and/or `legislation_sections_zh`). Exact
+counts depend on the archives you ingested; the reference snapshot is in
+[docs/coverage.md](docs/coverage.md).
+
+### Optional: historical versions
+
+Point-in-time `statute_history` needs the official Past Version archives.
+English past archives are roughly 2.1 GB.
 
 ```bash
 .venv/bin/hk-law download --data-dir data/raw --dataset past --languages en
 .venv/bin/hk-law ingest --data-dir data/raw --dataset past --language en
 ```
 
-### Use with Claude Code
+These commands ingest into the database named by `HK_LAW_DB`. Coverage and
+selection rules are in
+[docs/coverage.md#historical-legislation](docs/coverage.md#historical-legislation).
 
-The repository ships a project-scoped `.mcp.json` and `scripts/run_mcp.sh`:
+With the corpus in place, connect the server:
+[Use with Claude Code](#use-with-claude-code).
+
+## Use with Claude Code
+
+The repository ships a project-scoped `.mcp.json` and a user-scope installer.
+Use the project-scoped server while working in this repo; use the user-scope
+server to make the tools available in every project.
+
+| Scope | Server name | Setup |
+|---|---|---|
+| Project | `hk-criminal-law-local` | Approve `.mcp.json` in Claude Code |
+| User | `hk-criminal-law` | `bash scripts/install_global.sh` |
+
+### Project-scoped server
 
 ```json
 {
@@ -146,7 +194,11 @@ Open the project in Claude Code and approve `hk-criminal-law-local`. The 12
 skills under `skills/` are written for this server; `scripts/link_skills.sh`
 links them into `.claude/skills/` for project-scoped discovery.
 
-For **user-scope** availability in every project:
+```bash
+bash scripts/link_skills.sh
+```
+
+### User-scoped server
 
 ```bash
 bash scripts/install_global.sh
@@ -169,27 +221,78 @@ claude mcp add --scope user hk-criminal-law \
   -- "$PWD/.venv/bin/python" -m hk_criminal_law_mcp.server
 ```
 
-The MCP server is now global; the skills remain project-scoped unless you copy
-or link them into `~/.claude/skills/`.
+If you use the manual command instead of the installer, the MCP server is
+global but the skills remain project-scoped unless you copy or link them into
+`~/.claude/skills/`.
 
-### Use from the CLI
+## Use from the CLI
+
+Run these from the repository root. The CLI reads the database named by
+`HK_LAW_DB`; if you built the corpus in a new shell, set it first:
+
+```bash
+export HK_LAW_DB="$PWD/data/hk_law.db"
+```
+
+Alternatively, pass `--db <path>` before the subcommand, for example
+`hk-law --db data/hk_law.db stats`.
+
+### Legislation
 
 ```bash
 .venv/bin/hk-law get-section 221 9J
 .venv/bin/hk-law get-section-range 221 9A 9J
 .venv/bin/hk-law search-legislation "bail conditions" --cap 221
 .venv/bin/hk-law statute-history 221 9J --as-of 2020-01-01
+.venv/bin/hk-law section-versions 221 9J
+.venv/bin/hk-law list-ordinances
+```
+
+### Judgments
+
+```bash
 .venv/bin/hk-law search-cases "bail conditions" --court HKCFA
 .venv/bin/hk-law get-case "[2021] HKCFA 1" --paragraphs 1 3
+```
+
+### Verification
+
+```bash
 .venv/bin/hk-law verify "Cap. 221 s.9J"
 .venv/bin/hk-law verify-text "Cap. 221 s.9J; [2021] HKCFA 1"
+```
+
+### Research packs
+
+```bash
 .venv/bin/hk-law doctrine "bail conditions"
 .venv/bin/hk-law sentencing 210 9
 .venv/bin/hk-law authority "bail conditions" --live
 .venv/bin/hk-law case-graph "[2021] HKCFA 1"
 ```
 
+### Corpus health
+
+```bash
+.venv/bin/hk-law stats
+```
+
 ## MCP tools
+
+Every response carries provenance (`source_url`, `version_date`, language) and
+a disclaimer. Search responses say explicitly that a snippet is not the
+provision.
+
+If you are not sure where to start:
+
+- Find a provision: `search_legislation` → `get_section`.
+- Check a citation: `verify_citation` or `verify_citations`.
+- Read a judgment: `search_cases` → `get_case_paragraphs`.
+- Check later treatment: `note_up` or `case_graph`.
+- Explore an issue: `doctrine_research`, `sentencing_research`, or
+  `authority_ranking`.
+
+### Legislation tools
 
 | Tool | Purpose |
 |---|---|
@@ -199,23 +302,52 @@ or link them into `~/.claude/skills/`.
 | `statute_history` | Point-in-time provision text from the Past Version archives |
 | `list_section_versions` | Every historical version date available for a section |
 | `list_ordinances` | Browse indexed ordinances/regulations |
+
+### Judgment tools
+
+| Tool | Purpose |
+|---|---|
 | `search_cases` | Local judgment cache first, then HKLII's public search |
 | `get_case` | Fetch/cache a judgment by neutral citation; truncate safely |
 | `get_case_paragraphs` | Return specific numbered paragraphs |
 | `note_up` | HKLII note-up data (research aid, not a citator of record) |
+
+### Verification tools
+
+| Tool | Purpose |
+|---|---|
 | `verify_citation` | Verify a legislation or case citation |
 | `verify_citations` | Extract and verify every citation in a passage |
+
+### Research-pack tools
+
+| Tool | Purpose |
+|---|---|
 | `doctrine_research` | Legislation + ranked case leads for an issue |
 | `sentencing_research` | Penalty text + sentencing case leads (not a tariff) |
 | `authority_ranking` | Rank case results by court level and cached note-up |
 | `case_graph` | Outgoing and incoming citations for a case |
-| `corpus_status` | Counts, coverage, and last ingest/fetch times |
 
-Every response carries provenance (`source_url`, `version_date`, language) and
-a disclaimer. Search responses say explicitly that a snippet is not the
-provision.
+### Corpus status
+
+`corpus_status` reports counts, coverage, and last ingest/fetch times.
 
 ## Defence skills
+
+The 12 skills under `skills/` are practice scaffolds. They tell the model what
+to retrieve and verify, not what the law is.
+
+Common paths:
+
+- New arrest, summons, or police contact: `hk-criminal-intake` →
+  `hk-bail-application`.
+- Charge sheet or indictment: `hk-charge-analysis` →
+  `hk-case-file-review` → `hk-defense-strategy`.
+- Trial or sentence: `hk-trial-defense` → `hk-sentencing-mitigation`.
+- Appeal: `hk-appeal`.
+- Research question: `hk-legal-research`.
+- Special issues: `hk-juvenile-defense` or `hk-mental-health-criminal`.
+- Conduct and ethics: `hk-professional-ethics`.
 
 | Skill | Use |
 |---|---|
@@ -235,20 +367,24 @@ provision.
 Each skill instructs the model to retrieve the current provision and the
 paragraph it relies on. None of them authorises citation from memory.
 
+See [skills/README.md](skills/README.md) for installation and editing notes.
+
 ## Data sources and licensing
 
 - **Legislation:** Hong Kong e-Legislation current-version XML, published by
   the Department of Justice on [DATA.GOV.HK](https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-current).
-  Free reuse with attribution under the DATA.GOV.HK terms. See
-  `docs/data-sources-and-licensing.md`.
+  Free reuse with attribution under the DATA.GOV.HK terms.
 - **Judgments:** HKLII's public judgment/search endpoints are used on demand.
-  The Judiciary's Legal Reference System permits downloading for private study
-  and research; commercial reuse requires permission. This project does not
-  redistribute judgment text or a prebuilt judgment database.
+  The Judiciary's Legal Reference System permits downloading judgments for
+  private study and research; commercial reuse requires permission. This project
+  does not redistribute judgment text or a prebuilt judgment database.
 - **No warranty:** the HKLII JSON endpoints are undocumented and may change.
 
 Code is Apache-2.0. Skills and documentation are CC BY 4.0. Downloaded data is
 not covered by those licenses.
+
+Full terms, attribution rules, and a compliance checklist:
+[docs/data-sources-and-licensing.md](docs/data-sources-and-licensing.md).
 
 ## Reliability model
 
@@ -263,7 +399,8 @@ not covered by those licenses.
 6. **Unverified material is labelled** `[UNVERIFIED]` and cannot be presented
    as authority.
 
-See `docs/reliability.md` for the failure modes this model is designed to catch.
+See [docs/reliability.md](docs/reliability.md) for the failure modes this model
+is designed to catch, the verification controls, and the audit procedure.
 
 ## Limitations
 
@@ -281,6 +418,8 @@ See `docs/reliability.md` for the failure modes this model is designed to catch.
 - The skills are practice scaffolds, not a substitute for supervised legal
   work.
 
+See [docs/coverage.md](docs/coverage.md) for the full coverage picture.
+
 ## Roadmap
 
 - Bulk judgment import + incremental refresh.
@@ -290,12 +429,24 @@ See `docs/reliability.md` for the failure modes this model is designed to catch.
 - Offence-specific sentencing datasets.
 - Evaluation suite with gold-standard questions and citation checks.
 
+## Documentation map
+
+| If you want to... | Read |
+|---|---|
+| Understand how the corpus is built | [Architecture](docs/architecture.md) |
+| Know what is covered | [Coverage](docs/coverage.md) |
+| Check the verification model | [Reliability model](docs/reliability.md) |
+| Check data terms and attribution | [Data sources and licensing](docs/data-sources-and-licensing.md) |
+| Use or edit a defence workflow | [Defence skills](skills/README.md) |
+| See every document | [Documentation index](docs/README.md) |
+
 ## Contributing
 
 Good contributions: parser fixes, additional official data sources, offence/
 procedure skills with verified citations, tests for known hard cases, and
 reliability improvements. Please do not add unverified legal assertions or
-copied judgment text.
+copied judgment text. Documentation changes should follow the conventions in
+[docs/README.md](docs/README.md).
 
 ## License
 

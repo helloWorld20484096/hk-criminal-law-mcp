@@ -1,20 +1,28 @@
 # Architecture
 
+How HKeL XML becomes a local SQLite corpus, and how the MCP server reads it.
+Read this when you are changing the parser, schema, ingestion, retrieval, or
+MCP server.
+
+[Documentation index](README.md) · On this page:
+[Components](#components) · [Data flow](#data-flow) ·
+[SQLite schema](#sqlite-schema) · [Why local-first](#why-local-first) ·
+[Operational notes](#operational-notes)
+
 ## Components
 
-```
-src/hk_criminal_law_mcp/
-├── config.py              environment, endpoints, disclaimer
-├── db.py                  SQLite schema, connection, stats
-├── legislation_xml.py     HKeL XML parser and text renderer
-├── ingest_legislation.py  downloader + current/historical indexers
-├── citations.py           Cap./section and neutral-citation parsing/extraction
-├── search.py              legislation search, ranges, history, verification
-├── hklii.py               judgment/search/note-up client + cache
-├── research.py            doctrine/sentencing/authority/citation-graph packs
-├── server.py              MCP tools (FastMCP/MCPServer, stdio)
-└── cli.py                 hk-law command line
-```
+All modules live under `src/hk_criminal_law_mcp/`.
+
+- **`config.py`** — Environment, endpoints, disclaimer.
+- **`db.py`** — SQLite schema, connection, stats.
+- **`legislation_xml.py`** — HKeL XML parser and text renderer.
+- **`ingest_legislation.py`** — Downloader and current/historical indexers.
+- **`citations.py`** — Cap./section and neutral-citation parsing/extraction.
+- **`search.py`** — Legislation search, ranges, history, verification.
+- **`hklii.py`** — Judgment/search/note-up client and cache.
+- **`research.py`** — Doctrine/sentencing/authority/citation-graph packs.
+- **`server.py`** — MCP tools (FastMCP/MCPServer, stdio).
+- **`cli.py`** — `hk-law` command line.
 
 The MCP server is a thin layer over SQLite and the HKLII client. It has no
 server-side state beyond the SQLite file and the local cache.
@@ -96,12 +104,19 @@ a table alias. This is why the queries spell out `legislation_fts_en` etc.
 
 ## Operational notes
 
-- The default database path is `HK_LAW_DB` or
-  `~/.local/share/hk-criminal-law-mcp/hk_law.db`. The project launcher sets it
-  to `data/hk_law.db`.
+- The database path comes from `HK_LAW_DB`, defaulting to
+  `~/.local/share/hk-criminal-law-mcp/hk_law.db`. `scripts/run_mcp.sh` sets it
+  to `data/hk_law.db`; a bare `hk-law` invocation with no `HK_LAW_DB` uses the
+  home-directory default.
 - WAL mode is enabled. Back up the `.db` file after ingest if you want a
   reproducible corpus snapshot.
 - Re-running `ingest` is idempotent for a given document/language: it deletes
   and re-inserts that document's sections and FTS rows.
 - The downloaded archives and database are git-ignored and are not part of the
   source distribution.
+
+## Related
+
+[Coverage](coverage.md) · [Reliability model](reliability.md) ·
+[Data sources and licensing](data-sources-and-licensing.md) ·
+[Documentation index](README.md)
