@@ -89,6 +89,25 @@ If you already have archives, point `ingest` at them:
 .venv/bin/hk-law ingest --zip data/raw/hkel_c_leg_cap_1_cap_300_en.zip --language en
 ```
 
+### Prebuilt corpus (release assets)
+
+The [v0.1.0 data release](https://github.com/helloWorld20484096/hk-criminal-law-mcp/releases/tag/v0.1.0)
+contains a cleaned SQLite corpus (legislation only, no judgment text) and the
+eight official DATA.GOV.HK archives:
+
+```bash
+curl -LO https://github.com/helloWorld20484096/hk-criminal-law-mcp/releases/download/v0.1.0/hk_law_public.db.gz
+curl -LO https://github.com/helloWorld20484096/hk-criminal-law-mcp/releases/download/v0.1.0/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+gunzip hk_law_public.db.gz
+export HK_LAW_DB="$PWD/hk_law_public.db"
+.venv/bin/hk-law stats
+```
+
+The release database is built from the current-version e-Legislation XML as at
+2026-11-15. It contains no judgments, consistent with the source-data terms
+described in `docs/data-sources-and-licensing.md`.
+
 ### Use with Claude Code
 
 The repository ships a project-scoped `.mcp.json` and `scripts/run_mcp.sh`:
