@@ -96,7 +96,7 @@ The repository ships a project-scoped `.mcp.json` and `scripts/run_mcp.sh`:
 ```json
 {
   "mcpServers": {
-    "hk-criminal-law": {
+    "hk-criminal-law-local": {
       "command": "bash",
       "args": ["scripts/run_mcp.sh"]
     }
@@ -104,9 +104,9 @@ The repository ships a project-scoped `.mcp.json` and `scripts/run_mcp.sh`:
 }
 ```
 
-Open the project in Claude Code and approve the MCP server. The 12 skills under
-`skills/` are written for this server; `scripts/link_skills.sh` links them into
-`.claude/skills/` for project-scoped discovery.
+Open the project in Claude Code and approve `hk-criminal-law-local`. The 12
+skills under `skills/` are written for this server; `scripts/link_skills.sh`
+links them into `.claude/skills/` for project-scoped discovery.
 
 For **user-scope** availability in every project:
 
@@ -117,7 +117,11 @@ bash scripts/install_global.sh
 This creates a dedicated venv under `~/.local/share/hk-criminal-law-mcp`,
 installs the package there, links the local corpus, copies all 12 skills to
 `~/.claude/skills/hk-criminal-law` as one skills-dir plugin, and adds the MCP
-server at user scope.
+server at user scope under the name `hk-criminal-law`.
+
+The repository's project-scoped server is named `hk-criminal-law-local` so it
+does not collide with the global `hk-criminal-law` registration. Both expose
+the same tools.
 
 Manual equivalent:
 

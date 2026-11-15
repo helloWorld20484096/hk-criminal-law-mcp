@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "hk-criminal-law": {
+    "hk-criminal-law-local": {
       "command": "bash",
       "args": ["scripts/run_mcp.sh"]
     }
