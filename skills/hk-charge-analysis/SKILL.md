@@ -23,10 +23,12 @@ trigger_phrases:
 mcp_tools:
   - search_legislation
   - get_section
+  - statute_history
   - search_cases
   - get_case
   - get_case_paragraphs
   - verify_citation
+  - verify_citations
 ---
 
 # HK Charge Analysis
@@ -46,7 +48,9 @@ Record:
 
 ## Step 2 — Retrieve the provision
 
-Use `search_legislation` and `get_section`. Capture:
+Use `search_legislation` and `get_section`. If the alleged offence date is not
+today, also use `statute_history` to retrieve the provision in force on that
+date. Capture:
 - the heading and subsection structure;
 - definitions in the interpretation section;
 - any reverse burden or statutory presumption;

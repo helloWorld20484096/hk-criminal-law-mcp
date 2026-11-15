@@ -18,6 +18,19 @@ Version archives downloaded that day).
 The counts are from `hk-law stats`. The database is local and not distributed
 with the source repository.
 
+## Historical corpus counts (English Past Version archives)
+
+| Metric | Count |
+|---|---|
+| Historical document versions | 15,438 |
+| Historical sections/schedules | 851,431 |
+| Historical date range | 1997-06-30 .. 2026-08-01 |
+| Combined current + historical sections | 971,852 |
+
+These counts depend on which Past Version archives/languages were ingested.
+Traditional Chinese past versions can be added with
+`--dataset past --languages zh-Hant`.
+
 ## Core criminal law and procedure
 
 | Cap. | Title | Version date |

@@ -45,7 +45,9 @@ This is a working MVP, not a complete citator.
 The **current** corpus is always available. Point-in-time text requires the
 official Past Version archives; if they have not been ingested,
 `statute_history` returns the current text with an explicit warning rather than
-pretending it is historical.
+pretending it is historical. The reference snapshot also includes **15,438
+English historical versions / 851,431 sections** (1997–2026); see
+`docs/coverage.md`.
 
 ## Architecture
 

@@ -23,11 +23,15 @@ trigger_phrases:
 mcp_tools:
   - search_legislation
   - get_section
+  - statute_history
   - search_cases
   - get_case
   - get_case_paragraphs
   - note_up
+  - case_graph
+  - authority_ranking
   - verify_citation
+  - verify_citations
 ---
 
 # HK Defence Strategy
@@ -51,6 +55,8 @@ Record:
 
 For each charge:
 - retrieve the provision and elements (`hk-charge-analysis`);
+- if the alleged offence date is not today, use `statute_history` to check the
+  law in force on that date;
 - identify the strongest and weakest elements;
 - identify the evidence that proves each element;
 - identify evidence that is inadmissible, unreliable, or incomplete;
