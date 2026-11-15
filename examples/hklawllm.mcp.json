@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hklaw": {
+      "type": "http",
+      "url": "https://hklawllm.com/api/mcp"
+    }
+  }
+}

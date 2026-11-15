@@ -71,6 +71,24 @@ mcp_tools:
 7. **Answer and flag.** Give the answer, the strongest contrary authority, and
    the gaps. End with the verification table.
 
+## Optional hosted discovery layer (HKLawLLM)
+
+If an `hklaw` MCP server is configured (public page:
+<https://hklawllm.com/mcp>; endpoint: `https://hklawllm.com/api/mcp`), its
+tools may be used **for discovery only**:
+
+- `search_cases` — semantic case search over a larger hosted corpus
+- `statute_history` — point-in-time provision text
+- `sentencing_tariff`, `civil_quantum`, `family_orders` — benchmark/quantum leads
+- `doctrine`, `authority_top` — doctrine and authority ranking leads
+- `verify_citations` — a cross-check, not authority
+
+Every hosted result is a lead. Retrieve the actual judgment/provision and verify
+the citation with the local corpus or the official source. Do not send
+privileged or client-identifying material to a hosted third-party service
+without consent; its terms, privacy policy, pricing, and quotas apply. It is not
+affiliated with this project.
+
 ## Authority hierarchy (Hong Kong)
 
 - CFA judgments bind all courts.

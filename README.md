@@ -202,6 +202,24 @@ provision.
 Each skill instructs the model to retrieve the current provision and the
 paragraph it relies on. None of them authorises citation from memory.
 
+## Optional hosted MCP: HKLawLLM (third-party)
+
+The public setup/spec page is
+**[https://hklawllm.com/mcp](https://hklawllm.com/mcp)**; the actual MCP
+endpoint is **`https://hklawllm.com/api/mcp`** (Streamable HTTP + OAuth). It is
+a separate hosted service with a larger judgment corpus and 13 tools, including
+semantic case search, statute history, sentencing tariff, doctrine/authority
+ranking, and citation verification.
+
+- Integration notes: `docs/hklawllm-integration.md`
+- Opt-in config: `examples/hklawllm.mcp.json`
+- Protocol probe: `python scripts/check_hklawllm.py`
+
+It is not affiliated with this project, is not enabled by default, and has its
+own terms, pricing, and OAuth. Use it for discovery only; verify every citation
+against this repository's official corpus or the official source. Do not send
+privileged client data to a third-party service without consent.
+
 ## Data sources and licensing
 
 - **Legislation:** Hong Kong e-Legislation current-version XML, published by
@@ -213,6 +231,10 @@ paragraph it relies on. None of them authorises citation from memory.
   and research; commercial reuse requires permission. This project does not
   redistribute judgment text or a prebuilt judgment database.
 - **No warranty:** the HKLII JSON endpoints are undocumented and may change.
+- **Optional hosted third-party MCP:** HKLawLLM
+  ([public page](https://hklawllm.com/mcp), endpoint
+  `https://hklawllm.com/api/mcp`) is independent and opt-in. Its terms, privacy
+  policy, and pricing apply; this project does not redistribute its data.
 
 Code is Apache-2.0. Skills and documentation are CC BY 4.0. Downloaded data is
 not covered by those licenses.
