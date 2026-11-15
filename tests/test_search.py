@@ -4,6 +4,7 @@ from hk_criminal_law_mcp.search import (
     get_section,
     search_legislation,
     verify_citation,
+    verify_citations,
 )
 
 from .test_legislation_xml import XML
@@ -48,3 +49,16 @@ def test_verify_unknown_case_offline(conn):
     result = verify_citation(conn, "[2021] HKCFA 1", live=False)
     assert result["status"] == "unverified"
     assert result["type"] == "case"
+
+
+def test_verify_citations_batch(conn):
+    _load(conn)
+    result = verify_citations(
+        conn,
+        "Cap. 999 s.9; Cap. 999 s.99; [2021] HKCFA 1",
+        live=False,
+    )
+    assert result["summary"]["total"] == 3
+    assert result["summary"]["verified"] == 1
+    assert result["summary"]["not_found"] == 1
+    assert result["summary"]["unverified"] == 1

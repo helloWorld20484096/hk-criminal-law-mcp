@@ -23,10 +23,14 @@ trigger_phrases:
 mcp_tools:
   - search_legislation
   - get_section
+  - statute_history
+  - sentencing_research
   - search_cases
   - get_case
   - get_case_paragraphs
+  - authority_ranking
   - verify_citation
+  - verify_citations
 ---
 
 # HK Sentencing Mitigation
@@ -37,6 +41,8 @@ mcp_tools:
 ## Step 1 — Establish the sentencing framework
 
 - Offence provision and maximum penalty (`get_section`).
+- If the offence date matters, the provision in force on that date
+  (`statute_history`), not only the current text.
 - Any statutory minimum, mandatory sentence, or prescribed sentencing option.
 - The court's sentencing powers and any relevant ordinance.
 - Whether the offence is a "specified offence" or subject to a guideline.
@@ -45,16 +51,22 @@ mcp_tools:
 - Whether a psychiatric/medical disposal is available (Mental Health Ordinance,
   Cap. 136).
 
+`sentencing_research(cap, section)` returns the penalty text and sentencing
+case leads. It is **not** a sentencing tariff; use it as a starting point.
+
 ## Step 2 — Identify guideline authorities
 
-Use `search_cases` with the offence name, "sentencing", "guideline", "tariff",
-and the relevant court. Retrieve the key paragraphs. Record:
+Use `sentencing_research` for the offence, then `search_cases` with the offence
+name, "sentencing", "guideline", "tariff", and the relevant court. Use
+`authority_ranking` to sort leads by court level. Retrieve the key paragraphs
+with `get_case_paragraphs`. Record:
 - the guideline case and court;
 - the starting point / range;
 - aggravating and mitigating factors identified by the court;
 - whether the guideline has been updated or distinguished.
 
-Do not state a sentence range without a verified source.
+Do not state a sentence range without a verified source. Run
+`verify_citations` over the final mitigation outline.
 
 ## Step 3 — Aggravating factors
 

@@ -60,6 +60,52 @@ CREATE TABLE IF NOT EXISTS legislation_sections (
 CREATE INDEX IF NOT EXISTS idx_leg_sections_cap ON legislation_sections(cap, language);
 CREATE INDEX IF NOT EXISTS idx_leg_sections_no ON legislation_sections(cap, section_no, language);
 
+-- Historical versions from the DATA.GOV.HK "Past Version" archives. Kept
+-- separate from the current corpus so current-version lookups stay fast and
+-- unambiguous.
+CREATE TABLE IF NOT EXISTS legislation_history_docs (
+    id INTEGER PRIMARY KEY,
+    cap TEXT NOT NULL,
+    doc_type TEXT NOT NULL DEFAULT 'cap',
+    doc_number TEXT NOT NULL,
+    doc_name TEXT,
+    title TEXT,
+    long_title TEXT,
+    language TEXT NOT NULL,
+    version_date TEXT NOT NULL,
+    status TEXT,
+    source_url TEXT,
+    source_file TEXT,
+    checksum TEXT,
+    ingested_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (cap, doc_type, language, version_date)
+);
+
+CREATE TABLE IF NOT EXISTS legislation_history_sections (
+    id INTEGER PRIMARY KEY,
+    doc_id INTEGER NOT NULL REFERENCES legislation_history_docs(id) ON DELETE CASCADE,
+    cap TEXT NOT NULL,
+    doc_type TEXT NOT NULL DEFAULT 'cap',
+    section_key TEXT NOT NULL,
+    section_no TEXT,
+    heading TEXT,
+    text TEXT NOT NULL,
+    part TEXT,
+    division TEXT,
+    language TEXT NOT NULL,
+    version_date TEXT NOT NULL,
+    source_url TEXT,
+    source_note TEXT,
+    UNIQUE (doc_id, section_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hist_docs_cap
+    ON legislation_history_docs(cap, language, version_date);
+CREATE INDEX IF NOT EXISTS idx_hist_sections_lookup
+    ON legislation_history_sections(cap, section_no, language, version_date);
+CREATE INDEX IF NOT EXISTS idx_hist_sections_key
+    ON legislation_history_sections(cap, section_key, language, version_date);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS legislation_fts_en USING fts5(
     section_id UNINDEXED,
     cap UNINDEXED,
@@ -139,6 +185,26 @@ CREATE TABLE IF NOT EXISTS case_search_cache (
 """
 
 
+def _normalise_version_dates(conn: sqlite3.Connection) -> None:
+    """Trim ISO timestamps in version dates to YYYY-MM-DD (legacy rows)."""
+    conn.execute(
+        "UPDATE OR IGNORE legislation_docs "
+        "SET version_date=substr(version_date,1,10) "
+        "WHERE length(version_date)>10"
+    )
+    conn.execute(
+        "UPDATE OR IGNORE legislation_history_docs "
+        "SET version_date=substr(version_date,1,10) "
+        "WHERE length(version_date)>10"
+    )
+    conn.execute(
+        "UPDATE legislation_history_sections "
+        "SET version_date=substr(version_date,1,10) "
+        "WHERE length(version_date)>10"
+    )
+    conn.commit()
+
+
 def connect(path: str | Path | None = None) -> sqlite3.Connection:
     """Open the database with the project defaults and initialise the schema."""
     target = Path(path) if path else db_path()
@@ -148,6 +214,11 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    try:
+        _normalise_version_dates(conn)
+    except sqlite3.OperationalError:
+        # A concurrent ingest may hold the write lock; the next connection retries.
+        pass
     return conn
 
 
@@ -159,20 +230,32 @@ def stats(conn: sqlite3.Connection) -> dict:
 
     docs = one("SELECT COUNT(*) FROM legislation_docs")
     sections = one("SELECT COUNT(*) FROM legislation_sections")
+    history_docs = one("SELECT COUNT(*) FROM legislation_history_docs")
+    history_sections = one("SELECT COUNT(*) FROM legislation_history_sections")
     cases = one("SELECT COUNT(*) FROM cases")
     paragraphs = one("SELECT COUNT(*) FROM case_paragraphs")
     en = one("SELECT COUNT(*) FROM legislation_sections WHERE language='en'")
     zh = one("SELECT COUNT(*) FROM legislation_sections WHERE language LIKE 'zh%'")
+    hist_min = one("SELECT MIN(version_date) FROM legislation_history_docs")
+    hist_max = one("SELECT MAX(version_date) FROM legislation_history_docs")
     return {
         "legislation_docs": docs,
         "legislation_sections": sections,
         "legislation_sections_en": en,
         "legislation_sections_zh": zh,
+        "legislation_history_docs": history_docs,
+        "legislation_history_sections": history_sections,
+        "legislation_history_date_range": (
+            f"{hist_min} .. {hist_max}" if history_docs else None
+        ),
         "cases": cases,
         "case_paragraphs": paragraphs,
         "database": str(conn.execute("PRAGMA database_list").fetchone()[2]),
         "last_legislation_ingest": one(
             "SELECT MAX(ingested_at) FROM legislation_docs"
+        ),
+        "last_history_ingest": one(
+            "SELECT MAX(ingested_at) FROM legislation_history_docs"
         ),
         "last_case_fetch": one("SELECT MAX(fetched_at) FROM cases"),
     }

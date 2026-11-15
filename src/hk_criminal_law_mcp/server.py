@@ -16,11 +16,21 @@ from .config import DISCLAIMER
 from .db import connect, stats
 from .hklii import get_case_paragraphs as _get_case_paragraphs
 from .hklii import get_judgment, note_up as _note_up, search_cases as _search_cases
+from .research import (
+    authority_ranking as _authority_ranking,
+    case_graph as _case_graph,
+    doctrine_research as _doctrine_research,
+    sentencing_research as _sentencing_research,
+)
 from .search import (
     get_section as _get_section,
+    get_section_range as _get_section_range,
+    get_statute_history as _get_statute_history,
     list_ordinances as _list_ordinances,
+    list_section_versions as _list_section_versions,
     search_legislation as _search_legislation,
     verify_citation as _verify_citation,
+    verify_citations as _verify_citations,
 )
 
 mcp = _MCPServer(
@@ -84,6 +94,62 @@ def get_section(
     conn = _db()
     try:
         return _ok(_get_section(conn, cap, section, lang, max_chars))
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def get_section_range(
+    cap: str,
+    start: str,
+    end: str,
+    lang: str = "en",
+    max_chars: int = 4000,
+    limit: int = 100,
+) -> dict:
+    """Return all sections between two section numbers (inclusive).
+
+    Example: Cap. 221 sections 9A to 9J. Section ordering handles numeric and
+    letter suffixes. Parts/Orders may restart numbering; read the part context.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _get_section_range(conn, cap, start, end, lang, max_chars, limit)
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def statute_history(
+    cap: str,
+    section: str,
+    as_of: str | None = None,
+    lang: str = "en",
+    max_chars: int = 20000,
+) -> dict:
+    """Return the provision text in force on a date (YYYY-MM-DD).
+
+    Uses the official DATA.GOV.HK Past Version archives if ingested. If the
+    historical corpus is unavailable, returns the current text with
+    ``historical: false`` and an explicit warning.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _get_statute_history(conn, cap, section, as_of, lang, max_chars)
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def list_section_versions(cap: str, section: str, lang: str = "en") -> dict:
+    """List all historical version dates available for a section."""
+    conn = _db()
+    try:
+        return _ok(_list_section_versions(conn, cap, section, lang))
     finally:
         conn.close()
 
@@ -186,6 +252,101 @@ def verify_citation(citation: str, lang: str = "en", live: bool = True) -> dict:
     conn = _db()
     try:
         return _ok(_verify_citation(conn, citation, lang=lang, live=live))
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def verify_citations(text: str, lang: str = "en", live: bool = False) -> dict:
+    """Extract and verify every citation in a passage.
+
+    Defaults to local verification. Set live=True to fetch uncached judgments
+    from HKLII.
+    """
+    conn = _db()
+    try:
+        return _ok(_verify_citations(conn, text, lang=lang, live=live))
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def doctrine_research(
+    query: str,
+    lang: str = "en",
+    legislation_limit: int = 5,
+    case_limit: int = 5,
+    live_cases: bool = False,
+) -> dict:
+    """Return legislation hits and ranked case leads for a doctrine or issue.
+
+    This is a discovery pack, not a legal answer. Fetch and read the judgments
+    you intend to cite.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _doctrine_research(
+                conn, query, lang, legislation_limit, case_limit, live_cases
+            )
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def sentencing_research(
+    cap: str,
+    section: str,
+    lang: str = "en",
+    case_limit: int = 5,
+    live_cases: bool = False,
+) -> dict:
+    """Return penalty text and sentencing case leads for an offence.
+
+    Not a sentencing tariff. Extracts penalty language from the provision and
+    searches for sentencing material in the case corpus.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _sentencing_research(conn, cap, section, lang, case_limit, live_cases)
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def authority_ranking(
+    query: str,
+    court: str | None = None,
+    limit: int = 10,
+    lang: str = "en",
+    live: bool = False,
+) -> dict:
+    """Rank case results by court level and locally cached note-up data.
+
+    Not a citator of record; check later treatment before relying on a case.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _authority_ranking(conn, query, court, limit, lang, live)
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def case_graph(
+    citation: str,
+    lang: str = "en",
+    live_note_up: bool = True,
+) -> dict:
+    """Return outgoing cited cases and incoming note-up citations for a case."""
+    conn = _db()
+    try:
+        return _ok(_case_graph(conn, citation, lang, live_note_up))
     finally:
         conn.close()
 

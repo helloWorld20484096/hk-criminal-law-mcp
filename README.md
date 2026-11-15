@@ -34,23 +34,28 @@ This is a working MVP, not a complete citator.
 
 | Layer | Status |
 |---|---|
-| English legislation (Caps. 1–300, 301–600, 601+, instruments) | Indexed locally |
-| Traditional Chinese legislation | Indexed locally |
-| judgments | Fetched on demand from HKLII and cached; local full-text search grows with use |
-| Citation verification | Legislation + cached/live case citations |
+| English current legislation (Caps. 1–300, 301–600, 601+, instruments) | Indexed locally |
+| Traditional Chinese current legislation | Indexed locally |
+| Historical legislation (DATA.GOV.HK Past Version archives) | Indexed locally when downloaded; point-in-time `statute_history` |
+| Judgments | Fetched on demand from HKLII and cached; local full-text search grows with use |
+| Citation verification | Single citation + batch passage verification (`verify_citations`) |
+| Research packs | Doctrine leads, sentencing context, authority ranking, case citation graph |
 | Defence workflows | 12 skills under `skills/` |
 
-The corpus is the **current version** of legislation. Historical versions,
-commencement histories, and editorial notes are not reconstructed.
+The **current** corpus is always available. Point-in-time text requires the
+official Past Version archives; if they have not been ingested,
+`statute_history` returns the current text with an explicit warning rather than
+pretending it is historical.
 
 ## Architecture
 
 ```
-DATA.GOV.HK (DoJ e-Legislation XML)
+DATA.GOV.HK (DoJ e-Legislation XML: current + past versions)
         │  download + parse
         ▼
    SQLite (data/hk_law.db)
    ├── legislation_docs / legislation_sections
+   ├── legislation_history_docs / legislation_history_sections
    ├── legislation_fts_en / legislation_fts_zh
    ├── cases / case_paragraphs
    └── cases_fts_en / cases_fts_zh
@@ -76,9 +81,14 @@ python3 -m venv .venv
 
 # Official current-version legislation (English + Traditional Chinese).
 # This downloads roughly 1.3 GB of ZIPs and indexes ~120k sections.
-.venv/bin/hk-law download --data-dir data/raw
-.venv/bin/hk-law ingest --data-dir data/raw --language en
-.venv/bin/hk-law ingest --data-dir data/raw --language zh-Hant
+.venv/bin/hk-law download --data-dir data/raw --dataset current
+.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language en
+.venv/bin/hk-law ingest --data-dir data/raw --dataset current --language zh-Hant
+
+# Optional: official past versions for point-in-time statute_history.
+# English past archives are roughly 2.1 GB.
+.venv/bin/hk-law download --data-dir data/raw --dataset past --languages en
+.venv/bin/hk-law ingest --data-dir data/raw --dataset past --language en
 
 .venv/bin/hk-law stats
 ```
@@ -106,7 +116,14 @@ export HK_LAW_DB="$PWD/hk_law_public.db"
 
 The release database is built from the current-version e-Legislation XML as at
 2026-11-15. It contains no judgments, consistent with the source-data terms
-described in `docs/data-sources-and-licensing.md`.
+described in `docs/data-sources-and-licensing.md`. It is current-version only;
+for point-in-time text, download the Past Version archives and ingest them into
+the same database:
+
+```bash
+.venv/bin/hk-law download --data-dir data/raw --dataset past --languages en
+.venv/bin/hk-law ingest --data-dir data/raw --dataset past --language en
+```
 
 ### Use with Claude Code
 
@@ -157,11 +174,17 @@ or link them into `~/.claude/skills/`.
 
 ```bash
 .venv/bin/hk-law get-section 221 9J
+.venv/bin/hk-law get-section-range 221 9A 9J
 .venv/bin/hk-law search-legislation "bail conditions" --cap 221
+.venv/bin/hk-law statute-history 221 9J --as-of 2020-01-01
 .venv/bin/hk-law search-cases "bail conditions" --court HKCFA
 .venv/bin/hk-law get-case "[2021] HKCFA 1" --paragraphs 1 3
 .venv/bin/hk-law verify "Cap. 221 s.9J"
-.venv/bin/hk-law verify "[2021] HKCFA 1" --no-live
+.venv/bin/hk-law verify-text "Cap. 221 s.9J; [2021] HKCFA 1"
+.venv/bin/hk-law doctrine "bail conditions"
+.venv/bin/hk-law sentencing 210 9
+.venv/bin/hk-law authority "bail conditions" --live
+.venv/bin/hk-law case-graph "[2021] HKCFA 1"
 ```
 
 ## MCP tools
@@ -170,12 +193,20 @@ or link them into `~/.claude/skills/`.
 |---|---|
 | `search_legislation` | Full-text search over the indexed HKeL corpus (EN/ZH) |
 | `get_section` | One section/schedule, with heading, part, version date, URL |
+| `get_section_range` | All sections in a range, e.g. Cap. 221 ss. 9A–9J |
+| `statute_history` | Point-in-time provision text from the Past Version archives |
+| `list_section_versions` | Every historical version date available for a section |
 | `list_ordinances` | Browse indexed ordinances/regulations |
 | `search_cases` | Local judgment cache first, then HKLII's public search |
 | `get_case` | Fetch/cache a judgment by neutral citation; truncate safely |
 | `get_case_paragraphs` | Return specific numbered paragraphs |
 | `note_up` | HKLII note-up data (research aid, not a citator of record) |
 | `verify_citation` | Verify a legislation or case citation |
+| `verify_citations` | Extract and verify every citation in a passage |
+| `doctrine_research` | Legislation + ranked case leads for an issue |
+| `sentencing_research` | Penalty text + sentencing case leads (not a tariff) |
+| `authority_ranking` | Rank case results by court level and cached note-up |
+| `case_graph` | Outgoing and incoming citations for a case |
 | `corpus_status` | Counts, coverage, and last ingest/fetch times |
 
 Every response carries provenance (`source_url`, `version_date`, language) and
@@ -220,23 +251,30 @@ not covered by those licenses.
 ## Reliability model
 
 1. **Local corpus is authoritative for retrieval, not for legal conclusions.**
-2. **Every citation is verified** with `verify_citation` or retrieved in full.
+2. **Every citation is verified** with `verify_citation` or retrieved in full;
+   `verify_citations` checks a whole passage at once.
 3. **Judgments are cited by paragraph**, not by page or summary.
-4. **Currency is explicit:** legislation version date; judgment fetch date;
-   note-up warning.
-5. **Unverified material is labelled** `[UNVERIFIED]` and cannot be presented
+4. **Currency is explicit:** current or historical legislation version date;
+   judgment fetch date; note-up warning.
+5. **Point-in-time text is never inferred.** If the Past Version archive is not
+   ingested, `statute_history` returns the current text with an explicit warning.
+6. **Unverified material is labelled** `[UNVERIFIED]` and cannot be presented
    as authority.
 
 See `docs/reliability.md` for the failure modes this model is designed to catch.
 
 ## Limitations
 
-- Current-version legislation only; no historical versions or commencement
-  timelines.
+- Current-version legislation is always available. Point-in-time text requires
+  the official Past Version archives to be downloaded and ingested; coverage
+  depends on which ranges/languages were ingested. Commencement timelines are
+  not reconstructed.
 - Case law coverage is demand-driven. Bulk judgment import is a roadmap item.
 - HKLII endpoints are unofficial; a change or block is possible.
-- Note-up is not a citator of record. Check the Judiciary's LRS and the
-  judgment itself.
+- Note-up and authority ranking are not a citator of record. Check the
+  Judiciary's LRS and the judgment itself.
+- `sentencing_research` extracts penalty language and case leads; it is **not**
+  a sentencing tariff or a structured sentencing database.
 - Chinese search uses a trigram index; very short queries fall back to LIKE.
 - The skills are practice scaffolds, not a substitute for supervised legal
   work.
@@ -245,7 +283,7 @@ See `docs/reliability.md` for the failure modes this model is designed to catch.
 
 - Bulk judgment import + incremental refresh.
 - Citator-style treatment graph (cited/citing, positive/negative).
-- Historical legislation versions and commencement.
+- Historical Chinese point-in-time coverage and commencement timelines.
 - PDF/DOCX export with citation tables.
 - Offence-specific sentencing datasets.
 - Evaluation suite with gold-standard questions and citation checks.

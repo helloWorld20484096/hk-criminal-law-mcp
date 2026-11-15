@@ -17,6 +17,10 @@ the project is designed to catch and the controls it uses.
 | Language mismatch | English citation for a Chinese-only text | language field + `lang` parameter |
 | Overbroad search | keyword hit without legal relevance | snippet + full-text retrieval + analysis step |
 | Version drift | new amendment after download | `version_date` + re-download/ingest procedure |
+| Current text passed off as historical | using today's s.9J for a 2020 offence | `statute_history` returns `historical: false` with a warning when no past version is ingested |
+| Missed citation in a passage | only checking the first citation | `verify_citations` extracts and checks every citation in the text |
+| Invented sentencing number | quoting a tariff without a source | `sentencing_research` extracts penalty text and labels the result "not a tariff" |
+| Authority rank mistaken for citator | treating a high score as binding treatment | explicit warning; check note-up and the judgment |
 
 ## Controls
 
@@ -32,6 +36,10 @@ the project is designed to catch and the controls it uses.
 It returns `verified`, `not_found`, `unverified`, `mismatch`, or
 `unrecognised`. Case verification uses the local cache when available and
 HKLII when `live=True`.
+
+`verify_citations` applies the same checks to every citation found in a
+passage, deduplicates them, and reports a summary. It is the preferred control
+for draft submissions and research memos.
 
 ### 2. Provenance on every result
 
@@ -66,19 +74,33 @@ search snippet or a secondary source cannot be promoted to authority.
 
 ### 5. Currency and treatment
 
-- Legislation: `version_date` from the XML; current-version corpus.
+- Current legislation: `version_date` from the XML.
+- Historical legislation: `statute_history` returns the latest official version
+  dated on or before the requested date, plus the next version date. If the Past
+  Version archive is not ingested, it returns the current text with
+  `historical: false` and a warning; it never silently passes current text off
+  as historical.
 - Judgments: `fetched_at`; `note_up` warning.
+- `authority_ranking` is a court-level/cached-note-up heuristic, not a citator.
 - The tool never claims to be a citator of record.
 
-### 6. Tests
+### 6. Section ranges
+
+`get_section_range` orders sections by number/letter (9, 9A, 9J, 10) and returns
+part/division context. Parts and Orders can restart numbering; the tool warns
+and returns all matches rather than guessing which one the user meant.
+
+### 7. Tests
 
 `tests/` covers:
 
-- citation parsing and normalisation;
+- citation parsing, extraction and deduplication;
 - HKeL XML parsing (including repealed sections and schedules);
 - ingestion and FTS search;
-- get-section and verification;
-- judgment HTML paragraph extraction.
+- get-section, get-section-range and verification;
+- historical version selection, fallback and version listing;
+- judgment HTML paragraph extraction;
+- doctrine, sentencing and authority research packs.
 
 Run `.venv/bin/pytest -q`.
 
@@ -105,9 +127,12 @@ Use these in research outputs:
 ## Known limitations
 
 - HKLII endpoints are unofficial and may change.
-- Note-up data is not a citator of record.
+- Note-up data and authority ranking are not a citator of record.
 - Case law coverage is demand-driven, not exhaustive.
 - Chinese search uses trigram matching; very short queries fall back to LIKE.
-- The corpus is current-version only; historical research needs another source.
+- Historical coverage depends on which Past Version archives/languages were
+  ingested; commencement timelines are not reconstructed.
+- `sentencing_research` is not a sentencing tariff or a structured sentencing
+  database.
 - The skills are practice scaffolds, not legal advice or a substitute for
   supervised legal work.

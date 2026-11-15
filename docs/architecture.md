@@ -7,11 +7,12 @@ src/hk_criminal_law_mcp/
 ├── config.py              environment, endpoints, disclaimer
 ├── db.py                  SQLite schema, connection, stats
 ├── legislation_xml.py     HKeL XML parser and text renderer
-├── ingest_legislation.py  downloader and indexer
-├── citations.py           Cap./section and neutral-citation parsing
-├── search.py              legislation search, get-section, verification
+├── ingest_legislation.py  downloader + current/historical indexers
+├── citations.py           Cap./section and neutral-citation parsing/extraction
+├── search.py              legislation search, ranges, history, verification
 ├── hklii.py               judgment/search/note-up client + cache
-├── server.py              MCP tools (FastMCP, stdio)
+├── research.py            doctrine/sentencing/authority/citation-graph packs
+├── server.py              MCP tools (FastMCP/MCPServer, stdio)
 └── cli.py                 hk-law command line
 ```
 
@@ -22,11 +23,18 @@ server-side state beyond the SQLite file and the local cache.
 
 ### Legislation
 
-1. `download` fetches the official current-version ZIPs from DATA.GOV.HK.
-2. `ingest` opens each ZIP, parses every XML document with
-   `legislation_xml.parse_document`, and writes documents, sections, and FTS
-   rows in one transaction per archive.
-3. `search` and `get_section` read from SQLite. No network is required.
+1. `download --dataset current` fetches the official current-version ZIPs from
+   DATA.GOV.HK. `--dataset past` fetches the Past Version archives;
+   `--dataset both` fetches both.
+2. `ingest` auto-detects current vs past archives from their filenames and
+   routes them to the current or historical indexer. Each XML document is
+   parsed with `legislation_xml.parse_document`.
+3. Current versions go to `legislation_docs` / `legislation_sections` and the
+   FTS indexes. Historical versions go to `legislation_history_docs` /
+   `legislation_history_sections`, keyed by `version_date`; they are queried by
+   date, not full-text indexed.
+4. `search`, `get_section`, `get_section_range`, and `statute_history` read from
+   SQLite. No network is required.
 
 The parser:
 
@@ -60,10 +68,12 @@ Search-result caching uses `case_search_cache` with a default 6-hour TTL
 
 | Table | Purpose |
 |---|---|
-| `legislation_docs` | one row per Cap./instrument per language |
-| `legislation_sections` | citable sections/schedules with part/division context |
-| `legislation_fts_en` | FTS5 `porter unicode61` index |
-| `legislation_fts_zh` | FTS5 `trigram` index |
+| `legislation_docs` | one row per Cap./instrument per language (current) |
+| `legislation_sections` | citable current sections/schedules with part/division context |
+| `legislation_history_docs` | one row per Cap./instrument/language/version date |
+| `legislation_history_sections` | historical section text, indexed by Cap/section/date |
+| `legislation_fts_en` | FTS5 `porter unicode61` index (current) |
+| `legislation_fts_zh` | FTS5 `trigram` index (current) |
 | `cases` | cached judgments and metadata |
 | `case_paragraphs` | numbered paragraphs |
 | `cases_fts_en` / `cases_fts_zh` | judgment full-text indexes |

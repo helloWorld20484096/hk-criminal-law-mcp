@@ -7,6 +7,7 @@ import sqlite3
 
 from .citations import (
     LegislationCitation,
+    extract_citations,
     normalise_cap,
     normalise_section,
     parse_case_citation,
@@ -210,6 +211,263 @@ def get_section(
     return item
 
 
+def section_sort_key(value: str) -> tuple:
+    """Sort section numbers like 9, 9A, 9J, 23, sch3."""
+    norm = normalise_section(value)
+    if norm.lower().startswith("sch"):
+        return (1_000_000, norm, "")
+    match = re.match(r"^(\d+)([A-Za-z]*)(.*)$", norm)
+    if match:
+        return (int(match.group(1)), match.group(2).upper(), match.group(3))
+    return (10_000_000, norm, "")
+
+
+def _section_candidates(section: str) -> set[str]:
+    norm = normalise_section(section)
+    return {norm, f"s{norm}", f"sch{norm}"}
+
+
+def list_section_versions(
+    conn: sqlite3.Connection,
+    cap: str,
+    section: str,
+    lang: str = "en",
+) -> dict:
+    """List every historical version date available for a section."""
+    lang = "en" if lang == "en" else "zh-Hant"
+    cap_norm = normalise_cap(cap)
+    candidates = sorted(_section_candidates(section))
+    placeholders = ",".join("?" for _ in candidates)
+    rows = conn.execute(
+        f"""
+        SELECT d.version_date, s.heading, s.section_key, s.section_no
+        FROM legislation_history_sections s
+        JOIN legislation_history_docs d ON d.id = s.doc_id
+        WHERE s.cap = ? AND s.language = ?
+          AND (s.section_no IN ({placeholders}) COLLATE NOCASE
+               OR s.section_key IN ({placeholders}) COLLATE NOCASE)
+        ORDER BY d.version_date
+        """,
+        [cap_norm, lang, *candidates, *candidates],
+    ).fetchall()
+    return {
+        "cap": cap_norm,
+        "section": normalise_section(section),
+        "language": lang,
+        "count": len(rows),
+        "versions": [dict(row) for row in rows],
+        "warning": (
+            "Historical coverage depends on the DATA.GOV.HK Past Version archives "
+            "being downloaded and ingested."
+        ),
+    }
+
+
+def get_statute_history(
+    conn: sqlite3.Connection,
+    cap: str,
+    section: str,
+    as_of: str | None = None,
+    lang: str = "en",
+    max_chars: int = 20000,
+) -> dict:
+    """Return the provision text in force on a given date.
+
+    Uses the official Past Version archives. If no historical version is
+    available, returns the current section with ``historical: false`` rather
+    than pretending it is the historical text.
+    """
+    from datetime import date as _date
+
+    lang = "en" if lang == "en" else "zh-Hant"
+    cap_norm = normalise_cap(cap)
+    section_norm = normalise_section(section)
+    requested = as_of or _date.today().isoformat()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", requested):
+        return {
+            "found": False,
+            "error": "as_of must be YYYY-MM-DD",
+            "requested_date": requested,
+            "citation": f"Cap. {cap_norm} s.{section_norm}",
+        }
+
+    candidates = sorted(_section_candidates(section))
+    placeholders = ",".join("?" for _ in candidates)
+
+    current = get_section(conn, cap_norm, section, lang, max_chars=max_chars)
+    current_version = (current.get("version_date") or "")[:10] if current.get("found") else ""
+    if current.get("found") and current_version and requested >= current_version:
+        current["historical"] = False
+        current["current"] = True
+        current["requested_date"] = requested
+        current["historical_available"] = True
+        current["warning"] = (
+            "The requested date is on or after the current version date "
+            f"({current_version}); the current text is returned. Use an earlier "
+            "date to retrieve a historical version."
+        )
+        return current
+
+    row = conn.execute(
+        f"""
+        SELECT s.*, d.version_date AS doc_version_date,
+               d.title AS document_title, d.source_url AS doc_source_url
+        FROM legislation_history_sections s
+        JOIN legislation_history_docs d ON d.id = s.doc_id
+        WHERE s.cap = ? AND s.language = ?
+          AND (s.section_no IN ({placeholders}) COLLATE NOCASE
+               OR s.section_key IN ({placeholders}) COLLATE NOCASE)
+          AND d.version_date <= ?
+        ORDER BY d.version_date DESC
+        LIMIT 1
+        """,
+        [cap_norm, lang, *candidates, *candidates, requested],
+    ).fetchone()
+
+    next_row = None
+    if row:
+        next_row = conn.execute(
+            f"""
+            SELECT d.version_date
+            FROM legislation_history_sections s
+            JOIN legislation_history_docs d ON d.id = s.doc_id
+            WHERE s.cap = ? AND s.language = ?
+              AND (s.section_no IN ({placeholders}) COLLATE NOCASE
+                   OR s.section_key IN ({placeholders}) COLLATE NOCASE)
+              AND d.version_date > ?
+            ORDER BY d.version_date ASC
+            LIMIT 1
+            """,
+            [cap_norm, lang, *candidates, *candidates, requested],
+        ).fetchone()
+
+    if not row:
+        has_history = conn.execute(
+            f"""
+            SELECT 1 FROM legislation_history_sections
+            WHERE cap = ? AND language = ?
+              AND (section_no IN ({placeholders}) COLLATE NOCASE
+                   OR section_key IN ({placeholders}) COLLATE NOCASE)
+            LIMIT 1
+            """,
+            [cap_norm, lang, *candidates, *candidates],
+        ).fetchone()
+        if current.get("found"):
+            current["historical"] = False
+            current["requested_date"] = requested
+            current["historical_available"] = bool(has_history)
+            if has_history:
+                current["warning"] = (
+                    "No historical version dated on or before the requested date "
+                    "is available. The current-version text is returned instead; "
+                    "do not treat it as the law in force on the requested date."
+                )
+            else:
+                current["warning"] = (
+                    "No historical version is available for this section in the "
+                    "local corpus. The current-version text is returned instead; "
+                    "do not treat it as the law in force on the requested date. "
+                    "Download and ingest the DATA.GOV.HK Past Version archives."
+                )
+            return current
+        return {
+            "found": False,
+            "error": "section not found in historical or current corpus",
+            "citation": f"Cap. {cap_norm} s.{section_norm}",
+            "requested_date": requested,
+            "historical_available": bool(has_history),
+        }
+
+    text = row["text"] or ""
+    truncated = len(text) > max_chars
+    item = {
+        "found": True,
+        "historical": True,
+        "citation": _section_citation(row["cap"], row["section_no"] or row["section_key"]),
+        "cap": row["cap"],
+        "section": row["section_no"],
+        "heading": row["heading"],
+        "part": row["part"],
+        "division": row["division"],
+        "language": row["language"],
+        "version_date": row["doc_version_date"],
+        "requested_date": requested,
+        "document_title": row["document_title"],
+        "source_url": row["doc_source_url"],
+        "source_note": row["source_note"],
+        "text": text[:max_chars],
+        "truncated": truncated,
+        "full_length": len(text),
+        "next_version_date": next_row["version_date"] if next_row else None,
+        "warning": (
+            "This is the version in force on the requested date according to the "
+            "official Past Version archive. Check commencement and any later "
+            "amendment before relying on it."
+        ),
+    }
+    if next_row:
+        item["later_version_warning"] = (
+            f"A later version dated {next_row['version_date']} exists. The text "
+            "above is not the current law."
+        )
+    return item
+
+
+def get_section_range(
+    conn: sqlite3.Connection,
+    cap: str,
+    start: str,
+    end: str,
+    lang: str = "en",
+    max_chars: int = 4000,
+    limit: int = 100,
+) -> dict:
+    """Return all sections between start and end (inclusive) for a Cap."""
+    lang = "en" if lang == "en" else "zh-Hant"
+    cap_norm = normalise_cap(cap)
+    start_key = section_sort_key(start)
+    end_key = section_sort_key(end)
+    if end_key < start_key:
+        start_key, end_key = end_key, start_key
+
+    rows = conn.execute(
+        """
+        SELECT s.*, d.title AS document_title
+        FROM legislation_sections s
+        JOIN legislation_docs d ON d.id = s.doc_id
+        WHERE s.cap = ? AND s.language = ?
+        """,
+        (cap_norm, lang),
+    ).fetchall()
+
+    matched = [
+        row
+        for row in rows
+        if start_key <= section_sort_key(row["section_no"] or row["section_key"]) <= end_key
+    ]
+    matched.sort(key=lambda r: section_sort_key(r["section_no"] or r["section_key"]))
+    total = len(matched)
+    results = []
+    for row in matched[: max(1, min(limit, 500))]:
+        item = _row_to_legislation(row, include_text=True, max_chars=max_chars)
+        item["document_title"] = row["document_title"]
+        results.append(item)
+    return {
+        "cap": cap_norm,
+        "start": normalise_section(start),
+        "end": normalise_section(end),
+        "language": lang,
+        "count": len(results),
+        "total_matched": total,
+        "truncated": total > len(results),
+        "results": results,
+        "warning": (
+            "Section ordering is by number/letter. Parts and Orders can restart "
+            "numbering; read the part/division context and the full text."
+        ),
+    }
+
+
 def list_ordinances(
     conn: sqlite3.Connection,
     query: str | None = None,
@@ -229,6 +487,55 @@ def list_ordinances(
     return {
         "count": len(rows),
         "results": [dict(row) for row in rows],
+    }
+
+
+def verify_citations(
+    conn: sqlite3.Connection,
+    text: str,
+    lang: str = "en",
+    live: bool = False,
+) -> dict:
+    """Extract and verify every citation in a passage.
+
+    ``live=False`` (the default) verifies cases only if cached; legislation is
+    verified locally. Set ``live=True`` to fetch uncached judgments from HKLII.
+    """
+    matches = extract_citations(text)
+    summary = {
+        "total": len(matches),
+        "verified": 0,
+        "not_found": 0,
+        "unverified": 0,
+        "mismatch": 0,
+        "unrecognised": 0,
+    }
+    results = []
+    for match in matches:
+        result = verify_citation(conn, match.normalised, lang=lang, live=live)
+        status = result.get("status", "unrecognised")
+        if status in summary:
+            summary[status] += 1
+        results.append(
+            {
+                "raw": match.raw,
+                "normalised": match.normalised,
+                "kind": match.kind,
+                "start": match.start,
+                "end": match.end,
+                "status": status,
+                "result": result,
+            }
+        )
+    summary["all_verified"] = summary["total"] > 0 and summary["verified"] == summary["total"]
+    return {
+        "summary": summary,
+        "citations": results,
+        "warning": (
+            "A verified citation exists in the corpus; that does not by itself "
+            "establish that it supports the proposition. Read the provision or "
+            "paragraph in context."
+        ),
     }
 
 

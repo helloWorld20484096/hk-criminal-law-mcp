@@ -154,6 +154,12 @@ def _normalise_language(raw: str) -> str:
     return "en"
 
 
+def _normalise_date(raw: str) -> str:
+    """Keep the calendar date part of an ISO timestamp."""
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", raw or "")
+    return match.group(1) if match else (raw or "")
+
+
 def _meta_map(root: etree._Element) -> dict[str, str]:
     meta = root.find(Q("meta"))
     if meta is None:
@@ -178,7 +184,7 @@ def parse_document(data: bytes, source_file: str = "") -> ParsedDocument:
     doc_type = meta.get("docType") or "cap"
     doc_name = meta.get("docName") or f"Cap. {cap}"
     language = _normalise_language(meta.get("language") or root.get(XML_LANG) or "en")
-    version_date = meta.get("date") or ""
+    version_date = _normalise_date(meta.get("date") or "")
     status = meta.get("docStatus") or ""
 
     main = root.find(Q("main"))

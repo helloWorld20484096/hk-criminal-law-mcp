@@ -23,10 +23,13 @@ trigger_phrases:
 mcp_tools:
   - search_legislation
   - get_section
+  - statute_history
   - search_cases
   - get_case
   - get_case_paragraphs
+  - case_graph
   - verify_citation
+  - verify_citations
 ---
 
 # HK Case File Review
@@ -119,6 +122,8 @@ applicable disclosure principles in HK authority.
 
 For each charge:
 - retrieve the provision and check the elements;
+- use `statute_history` to check the provision in force on the date of the
+  alleged offence, not only the current text;
 - identify elements not evidenced;
 - identify defences raised by the evidence;
 - check whether the charge is duplicitous or wrongly particularised;

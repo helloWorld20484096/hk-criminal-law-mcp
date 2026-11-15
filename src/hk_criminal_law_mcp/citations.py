@@ -118,3 +118,95 @@ def parse_legislation_citation(text: str) -> LegislationCitation | None:
         return LegislationCitation(cap=cap, schedule=normalise_section(m.group(4)).lstrip("sch"))
     section = normalise_section(m.group(2)) if m.group(2) else None
     return LegislationCitation(cap=cap, section=section)
+
+
+@dataclass(frozen=True)
+class CitationMatch:
+    """A citation found in free text, with its normalised form and span."""
+
+    kind: str  # "legislation" | "case"
+    raw: str
+    normalised: str
+    start: int
+    end: int
+
+
+def extract_citations(text: str) -> list[CitationMatch]:
+    """Extract unique legislation and case citations from a passage.
+
+    Handles both ``Cap. 221 s.9J`` and ``section 9J of Cap. 221``. A bare
+    ``Cap. 221`` is retained because it can still be verified at document level.
+    """
+    text = text or ""
+    matches: list[CitationMatch] = []
+
+    for match in _CASE_RE.finditer(text):
+        citation = CaseCitation(
+            year=int(match.group(1)),
+            code=match.group(2),
+            number=match.group(3),
+        )
+        matches.append(
+            CitationMatch(
+                "case",
+                match.group(0),
+                citation.normalised,
+                match.start(),
+                match.end(),
+            )
+        )
+
+    reverse_spans: list[tuple[int, int]] = []
+    for match in _LEG_REVERSE_RE.finditer(text):
+        citation = LegislationCitation(
+            cap=normalise_cap(match.group(2)),
+            section=normalise_section(match.group(1)),
+        )
+        matches.append(
+            CitationMatch(
+                "legislation",
+                match.group(0),
+                citation.normalised,
+                match.start(),
+                match.end(),
+            )
+        )
+        reverse_spans.append((match.start(), match.end()))
+
+    for match in _LEG_RE.finditer(text):
+        if any(
+            not (match.end() <= start or match.start() >= end)
+            for start, end in reverse_spans
+        ):
+            continue
+        cap = normalise_cap(match.group(1))
+        if match.group(4):
+            citation = LegislationCitation(
+                cap=cap,
+                schedule=normalise_section(match.group(4)).lstrip("sch"),
+            )
+        else:
+            citation = LegislationCitation(
+                cap=cap,
+                section=normalise_section(match.group(2)) if match.group(2) else None,
+            )
+        matches.append(
+            CitationMatch(
+                "legislation",
+                match.group(0),
+                citation.normalised,
+                match.start(),
+                match.end(),
+            )
+        )
+
+    matches.sort(key=lambda item: (item.start, item.end))
+    seen: set[tuple[str, str]] = set()
+    unique: list[CitationMatch] = []
+    for item in matches:
+        key = (item.kind, item.normalised)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique

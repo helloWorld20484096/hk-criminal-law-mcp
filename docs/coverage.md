@@ -1,7 +1,7 @@
 # Coverage
 
-Snapshot: **2026-11-15** (corpus built from the DATA.GOV.HK current-version
-archives downloaded that day).
+Snapshot: **2026-11-15** (current-version archives plus the English Past
+Version archives downloaded that day).
 
 ## Corpus counts
 
@@ -46,21 +46,49 @@ enactment.
 ## Included
 
 - Ordinances and subsidiary legislation in the current-version XML archives.
+- Historical versions from the official Past Version archives when downloaded
+  and ingested (English by default in this snapshot).
 - Sections, schedules, Parts, Divisions, and High Court Order rule context.
-- English and Traditional Chinese text.
+- English and Traditional Chinese current text.
 - Repealed sections are skipped; operative sections are kept.
 - Source notes are stored separately from the operative text.
+- Point-in-time lookup with `statute_history(cap, section, as_of)`.
 
 ## Not included
 
-- Historical versions or point-in-time legislation.
-- Commencement timelines beyond the document date.
+- Historical versions for ranges/languages whose past archives were not
+  ingested.
+- Commencement timelines beyond the document/version dates.
 - Editorial notes, annotations, or commentary.
 - Practice directions, court guides, and sentencing guidelines as separate
   corpora (some may appear in judgments).
 - A prebuilt judgment database.
 - Reported-case series (HKLR, HKC, etc.) not available through HKLII.
-- A citator of record (note-up is a research aid only).
+- A citator of record (note-up and authority ranking are research aids only).
+
+## Historical legislation
+
+The Past Version archives are published by the Department of Justice on
+DATA.GOV.HK under the same free-reuse terms as the current archives. They are
+optional and large.
+
+```bash
+# English past versions (~2.1 GB of ZIPs)
+.venv/bin/hk-law download --data-dir data/raw --dataset past --languages en
+.venv/bin/hk-law ingest --data-dir data/raw --dataset past --language en
+
+# Example: what did Cap. 221 s.9J say on 1 June 2020?
+.venv/bin/hk-law statute-history 221 9J --as-of 2020-06-01
+.venv/bin/hk-law section-versions 221 9J
+```
+
+If a section/date has no ingested historical version, `statute_history`
+returns the current text with `historical: false` and an explicit warning. It
+never silently presents current text as historical law.
+
+Historical counts are reported by `hk-law stats` as
+`legislation_history_docs`, `legislation_history_sections`, and
+`legislation_history_date_range`.
 
 ## Case law
 
@@ -70,6 +98,9 @@ Judgments are **demand-driven**:
 2. `get_case` fetches the full judgment by neutral citation and caches it.
 3. `get_case_paragraphs` retrieves numbered paragraphs.
 4. `note_up` caches HKLII's note-up payload.
+5. `case_graph` returns outgoing cited cases and incoming note-up citations.
+6. `authority_ranking` ranks results by court level and cached note-up data.
+7. `doctrine_research` combines legislation hits with ranked case leads.
 
 Coverage grows as you use the tool. The initial database contains only the
 cases you have fetched. There is no bundled judgment corpus because the

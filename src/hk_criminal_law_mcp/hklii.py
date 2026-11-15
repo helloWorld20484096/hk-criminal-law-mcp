@@ -294,6 +294,8 @@ def _search_local(
                 "citation": row["neutral_citation"],
                 "title": row["title"],
                 "court": row["court"],
+                "court_code": row["court_code"],
+                "court_abbr": row["court_code"],
                 "year": row["year"],
                 "number": row["num"],
                 "language": row["language"],

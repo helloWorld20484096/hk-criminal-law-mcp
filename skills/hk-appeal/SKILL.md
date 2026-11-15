@@ -22,11 +22,15 @@ trigger_phrases:
 mcp_tools:
   - search_legislation
   - get_section
+  - statute_history
   - search_cases
   - get_case
   - get_case_paragraphs
   - note_up
+  - case_graph
+  - authority_ranking
   - verify_citation
+  - verify_citations
 ---
 
 # HK Criminal Appeal
@@ -97,8 +101,11 @@ For each ground, state:
 ## Step 5 — Authorities
 
 Use `search_cases` and `get_case_paragraphs` for each ground. Prefer CFA and CA
-authority. Check subsequent treatment with `note_up`. Do not cite a case for a
-proposition that the paragraph does not support.
+authority; use `authority_ranking` to sort leads. Check subsequent treatment
+with `note_up` and `case_graph`. If the ground depends on the law at the date of
+trial or offence, use `statute_history`. Do not cite a case for a proposition
+that the paragraph does not support. Run `verify_citations` over the grounds of
+appeal before settling them.
 
 ## Output template
 

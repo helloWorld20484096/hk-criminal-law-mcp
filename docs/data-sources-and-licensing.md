@@ -5,12 +5,16 @@ They have different licenses and different obligations.
 
 ## 1. Hong Kong e-Legislation (legislation)
 
-**Source:** Department of Justice, Hong Kong e-Legislation, current-version XML
-bulk archives published on DATA.GOV.HK:
+**Source:** Department of Justice, Hong Kong e-Legislation, XML bulk archives
+published on DATA.GOV.HK:
 
-- Dataset: <https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-current>
-- Files: `hkel_c_leg_cap_*`, `hkel_c_instruments_*` (English, Traditional
-  Chinese, Simplified Chinese)
+- Current version:
+  <https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-current>
+  — files `hkel_c_leg_cap_*`, `hkel_c_instruments_*`
+- Past versions:
+  <https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-past>
+  — files `hkel_p_leg_cap_*`, `hkel_p_instruments_*`
+- Languages: English, Traditional Chinese, Simplified Chinese
 - Format: ZIP containing HKL M 1.0 XML
 
 **Terms:** DATA.GOV.HK terms of use. The data is free to reuse with
@@ -24,9 +28,11 @@ attribution. This project:
 **Attribution in outputs:** include the Cap. number, section, version date, and
 the e-Legislation URL. Do not present the local copy as the official text.
 
-**Currency:** the archives are the **current version** at the time of download.
-The `version_date` column records the document date from the XML metadata.
-Historical versions and commencement timelines are not reconstructed.
+**Currency:** the current archives are the version in force at the time of
+download. The Past Version archives are official historical versions; when
+ingested, `statute_history` returns the latest official version dated on or
+before the requested date. Coverage depends on which past archives/languages
+were ingested. Commencement timelines are not reconstructed.
 
 ## 2. Hong Kong Judiciary — Legal Reference System (judgments)
 
