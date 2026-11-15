@@ -1,0 +1,23 @@
+HK Criminal Law MCP
+Copyright 2026 HK Criminal Law MCP contributors
+
+This product includes or retrieves data from:
+
+1. Hong Kong e-Legislation, published by the Department of Justice of the Hong
+   Kong Special Administrative Region on DATA.GOV.HK. Reused under the
+   DATA.GOV.HK terms of use with attribution. The archives and the generated
+   SQLite database are not redistributed with this source distribution.
+
+2. HKLII (Hong Kong Legal Information Institute), used for on-demand judgment
+   retrieval and search. HKLII is an independent free-access service, not an
+   official government source. Judgment text remains subject to the terms of
+   HKLII and the Hong Kong Judiciary. This project does not redistribute
+   judgment text.
+
+3. The Hong Kong Judiciary's Legal Reference System, referenced by URL only.
+   Downloading is permitted for private study and research; commercial reuse
+   requires permission from the Judiciary.
+
+The software is provided "AS IS", without warranty of any kind. See LICENSE for
+the Apache-2.0 terms and LICENSE-SKILLS for the CC BY 4.0 terms applicable to
+the skills and documentation.

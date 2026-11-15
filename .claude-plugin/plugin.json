@@ -1,0 +1,9 @@
+{
+  "name": "hk-criminal-law",
+  "version": "0.1.0",
+  "description": "Local-first Hong Kong criminal law and defence research MCP with 12 practice skills",
+  "author": {
+    "name": "HK Criminal Law MCP contributors"
+  },
+  "license": "Apache-2.0"
+}

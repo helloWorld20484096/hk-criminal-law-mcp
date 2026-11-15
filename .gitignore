@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Downloaded legislation archives and generated indexes are not redistributed.
+data/
+
+# Local runtime state
+*.db
+*.db-wal
+*.db-shm
+.cache/
