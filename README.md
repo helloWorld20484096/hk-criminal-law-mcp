@@ -111,6 +111,17 @@ Open the project in Claude Code and approve the MCP server. The 12 skills under
 For **user-scope** availability in every project:
 
 ```bash
+bash scripts/install_global.sh
+```
+
+This creates a dedicated venv under `~/.local/share/hk-criminal-law-mcp`,
+installs the package there, links the local corpus, copies all 12 skills to
+`~/.claude/skills/hk-criminal-law` as one skills-dir plugin, and adds the MCP
+server at user scope.
+
+Manual equivalent:
+
+```bash
 claude mcp add --scope user hk-criminal-law \
   -e HK_LAW_DB="$PWD/data/hk_law.db" \
   -- "$PWD/.venv/bin/python" -m hk_criminal_law_mcp.server
