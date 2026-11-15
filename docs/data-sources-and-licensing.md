@@ -67,33 +67,13 @@ not an official Judiciary API. The client:
 **Attribution:** cite the neutral citation and link to the HKLII or Judiciary
 source. Do not describe HKLII as an official government source.
 
-## 4. Optional hosted third-party MCP: HKLawLLM
-
-**Service:** 師爺仔 HKLaw·GPT, <https://hklawllm.com/mcp> (public setup/spec
-page); MCP endpoint `https://hklawllm.com/api/mcp` (Streamable HTTP + OAuth).
-
-This is an independent hosted service. It is **not affiliated with this
-project**, is not required, and is not enabled by default. If you connect it:
-
-- its terms of service, privacy policy, pricing, quotas, and data-handling
-  practices apply;
-- OAuth tokens are managed by your MCP client, not by this repository;
-- do not send privileged, confidential, or client-identifying material without
-  informed consent and a terms/privacy review;
-- do not treat its summaries, rankings, or citation checks as authority;
-  verify against the official provision or judgment.
-
-This project does not redistribute HKLawLLM data. See
-`docs/hklawllm-integration.md` for the public protocol metadata and the
-verification scope.
-
-## 5. Hong Kong Bill of Rights and constitutional instruments
+## 4. Hong Kong Bill of Rights and constitutional instruments
 
 The Bill of Rights Ordinance (Cap. 383) and constitutional instruments are
 included in the e-Legislation archives and are subject to the same DATA.GOV.HK
 terms.
 
-## 6. Project licenses
+## 5. Project licenses
 
 - **Code** (`src/`, `tests/`, `scripts/`): Apache License 2.0 — see `LICENSE`.
 - **Skills and documentation** (`skills/`, `docs/`): CC BY 4.0 — see
@@ -101,7 +81,7 @@ terms.
 - **Downloaded data**: not covered by the project licenses; governed by the
   source terms above.
 
-## 7. Practical compliance checklist
+## 6. Practical compliance checklist
 
 ```
 [ ] I downloaded legislation from DATA.GOV.HK, not a secondary site.
@@ -110,7 +90,4 @@ terms.
 [ ] I checked the Judiciary/HKLII terms before commercial use.
 [ ] I did not present the local copy as the official text.
 [ ] I did not bulk-crawl HKLII or bypass its rate limits.
-[ ] If I connected HKLawLLM, I checked its terms, privacy policy, and quotas.
-[ ] I did not send privileged/client-identifying data to a hosted service
-    without consent.
 ```
