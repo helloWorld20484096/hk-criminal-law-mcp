@@ -57,8 +57,10 @@ This is a working MVP, not a complete citator.
 | Traditional Chinese current legislation | Indexed locally |
 | Historical legislation (DATA.GOV.HK Past Version archives) | Indexed locally when downloaded; point-in-time `statute_history` |
 | Judgments | Locally indexed from an authorised import or permission-gated citation sync; no built-in LRS/HKLII crawler |
-| Citation verification | Single citation + batch passage verification (`verify_citations`) |
+| DOJ policy publications | Prosecution Code and domestic-violence prosecution policy indexed locally from `doj.gov.hk`; `search_doj` / `get_doj_document` |
+| Citation verification | Single citation + batch passage verification (`verify_citations`); DOJ policy citations with `verify_doj` |
 | Research packs | Doctrine leads, sentencing context, authority ranking, case citation graph |
+| Semantic atlas | Static HTML/WebGL map of all current legislation sections (EN + ZH) |
 | Defence workflows | 12 skills under `skills/` |
 
 The **current** corpus is always available. Point-in-time text requires the
@@ -72,10 +74,10 @@ English historical versions / 851,431 sections** (1997–2026); see
 
 | Layer | What it does |
 |---|---|
-| Source | DATA.GOV.HK e-Legislation XML: current and Past Version archives |
-| Local corpus | SQLite at `data/hk_law.db`: current legislation + FTS, historical legislation, locally imported judgments + FTS |
-| Local sync | `hk-law sync`: DATA.GOV.HK legislation updates + authorised judgment imports; permission-gated HKLII citation fetch |
-| Interfaces | `hk-criminal-law` MCP server (stdio) and `hk-law` CLI |
+| Source | DATA.GOV.HK e-Legislation XML (current and Past Version archives); DOJ Prosecution Code and prosecution policies |
+| Local corpus | SQLite at `data/hk_law.db`: current legislation + FTS, historical legislation, locally imported judgments + FTS, DOJ policy documents + FTS |
+| Local sync | `hk-law sync`: DATA.GOV.HK legislation updates, DOJ policy updates, and authorised judgment imports; permission-gated HKLII citation fetch |
+| Interfaces | `hk-criminal-law` MCP server (stdio), `hk-law` CLI, and the static semantic atlas |
 | Live retrieval | Default for case queries: HKLII JSON endpoints; opt out with `HK_LAW_LOCAL_ONLY=1`; bulk sync permission-gated |
 
 The legislation corpus is local. Case search/read uses live HKLII by default so
@@ -83,6 +85,25 @@ results are current; set `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. No
 judgment text is stored in or distributed by the repository.
 
 For module-level detail, see [docs/architecture.md](docs/architecture.md).
+
+### Semantic atlas
+
+`semantic_map/` turns the current legislation corpus into a low-dimensional
+semantic map: multilingual embeddings, PCA/UMAP, clustered topics, and a
+responsive static HTML/WebGL explorer. It is a separate, optional build because
+it requires the embedding pipeline. See
+[semantic_map/README.md](semantic_map/README.md) for the build and deployment
+steps.
+
+### Agentic use
+
+The MCP is designed for automatic agent calls: the server instructions require
+citation verification, and `.claude/agents/hk-law-researcher.md` provides a ready
+research subagent. Agents also get semantic-atlas tools (`semantic_search`,
+`semantic_locate`, `semantic_neighbors`, `semantic_clusters`,
+`semantic_cluster`) alongside the legislation and judgment tools. See
+[docs/agentic-use.md](docs/agentic-use.md) for Claude Code and external
+framework setup.
 
 ## Quick start
 
@@ -189,6 +210,12 @@ export HK_LAW_DB="$PWD/data/hk_law.db"
 # Check DATA.GOV.HK, download only changed archives, ingest only changed documents.
 .venv/bin/hk-law sync --dataset current
 .venv/bin/hk-law sync-status
+
+# Update the DOJ Prosecution Code and domestic-violence policy.
+.venv/bin/hk-law sync-doj
+.venv/bin/hk-law search-doj "alternatives to prosecution"
+.venv/bin/hk-law get-doj prosecution_ch5 --paragraphs 5.9
+.venv/bin/hk-law verify-doj "Prosecution Code §5.9"
 
 # Import a judgment corpus you are authorised to use (JSONL/CSV/SQLite/HTML dir).
 .venv/bin/hk-law import-cases \
@@ -337,6 +364,7 @@ If you are not sure where to start:
 
 - Find a provision: `search_legislation` → `get_section`.
 - Check a citation: `verify_citation` or `verify_citations`.
+- Check prosecution policy: `doj_status` → `search_doj` → `get_doj_document`.
 - Read a judgment: `search_cases` → `get_case_paragraphs`.
 - Check later treatment: `note_up` or `case_graph`.
 - Explore an issue: `doctrine_research`, `sentencing_research`, or
@@ -352,6 +380,17 @@ If you are not sure where to start:
 | `statute_history` | Point-in-time provision text from the Past Version archives |
 | `list_section_versions` | Every historical version date available for a section |
 | `list_ordinances` | Browse indexed ordinances/regulations |
+
+### DOJ policy tools
+
+| Tool | Purpose |
+|---|---|
+| `search_doj` | Search the local Prosecution Code and domestic-violence policy corpus |
+| `get_doj_document` | Read a DOJ page by slug, optionally filtered to paragraph numbers |
+| `list_doj_documents` | Browse indexed DOJ publications and paragraph counts |
+| `verify_doj` | Verify a DOJ policy citation such as `Prosecution Code §5.9` |
+| `doj_status` | DOJ coverage, freshness and provenance |
+| `sync_doj` | Politeness-limited incremental DOJ update (also `hk-law sync-doj`) |
 
 ### Judgment tools
 
@@ -429,6 +468,11 @@ See [skills/README.md](skills/README.md) for installation and editing notes.
 - **Legislation:** Hong Kong e-Legislation current-version XML, published by
   the Department of Justice on [DATA.GOV.HK](https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-current).
   Free reuse with attribution under the DATA.GOV.HK terms.
+- **DOJ policy publications:** the Prosecution Code and the domestic-violence
+  prosecution policy are fetched from <https://www.doj.gov.hk/> at the
+  operator's direction, cached locally in the SQLite corpus, and not
+  redistributed. They are policy material, not legislation or judgments.
+  Verify every paragraph against the DOJ source.
 - **Judgments:** the default MCP uses live HKLII query-time access for case
   search/read; it stores no judgment text in the repository. Judgment text is
   imported only from an authorised corpus, or fetched through a
@@ -506,6 +550,8 @@ See [docs/coverage.md](docs/coverage.md) for the full coverage picture.
 | Know what is covered | [Coverage](docs/coverage.md) |
 | Check the verification model | [Reliability model](docs/reliability.md) |
 | Check data terms and attribution | [Data sources and licensing](docs/data-sources-and-licensing.md) |
+| Explore the corpus as a semantic map | [Semantic atlas](semantic_map/README.md) |
+| Use the MCP from an agent | [Agentic use](docs/agentic-use.md) |
 | Use or edit a defence workflow | [Defence skills](skills/README.md) |
 | See every document | [Documentation index](docs/README.md) |
 

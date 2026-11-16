@@ -8,13 +8,18 @@ This product includes or retrieves data from:
    DATA.GOV.HK terms of use with attribution. The archives and the generated
    SQLite database are not redistributed with this source distribution.
 
-2. HKLII (Hong Kong Legal Information Institute), used for on-demand judgment
+2. Hong Kong Department of Justice publications (the Prosecution Code and the
+   domestic-violence prosecution policy), retrieved from doj.gov.hk. Cached
+   locally for research; not redistributed. Policy material is not legislation
+   or a judgment.
+
+3. HKLII (Hong Kong Legal Information Institute), used for on-demand judgment
    retrieval and search. HKLII is an independent free-access service, not an
    official government source. Judgment text remains subject to the terms of
    HKLII and the Hong Kong Judiciary. This project does not redistribute
    judgment text.
 
-3. The Hong Kong Judiciary's Legal Reference System, referenced by URL only.
+4. The Hong Kong Judiciary's Legal Reference System, referenced by URL only.
    Downloading is permitted for private study and research; commercial reuse
    requires permission from the Judiciary.
 

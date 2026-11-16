@@ -45,7 +45,8 @@ the proposition.
 | **Stale law** — relying on a repealed or amended provision | current-version corpus + `version_date`; repealed sections skipped |
 | **Wrong paragraph** — attributing a holding to the wrong paragraph | `get_case_paragraphs` returns numbered paragraphs |
 | **Overruled authority** — citing a case later reversed | `note_up` + explicit warning; human check required |
-| **Secondary-source contamination** — blog/news summary | only primary legislation/judgments are indexed |
+| **Secondary-source contamination** — blog/news summary | only primary legislation/judgments and official DOJ policy pages are indexed |
+| **DOJ policy treated as authority** — citing a Prosecution Code paragraph as if it were a statute or judgment | `verify_doj` confirms only that the paragraph exists locally; every DOJ result carries a policy warning and source URL |
 | **Silent retrieval failure** — HKLII changes its endpoint | error surfaced, not converted into a fake answer |
 | **Language mismatch** — English citation for a Chinese-only text | language field + `lang` parameter |
 | **Overbroad search** — keyword hit without legal relevance | snippet + full-text retrieval + analysis step |
@@ -152,10 +153,13 @@ Use these in research outputs:
 1. Sample 10 random sections from the corpus; compare heading and text to the
    e-Legislation website.
 2. Sample 5 imported judgments; compare paragraph numbers to the source.
-3. Run `verify_citation` on known-good and deliberately wrong citations.
-4. Check `corpus_status` / `sync_status` for version dates, last sync, and
-   judgment-source provenance.
-5. Re-run `pytest`.
+3. Sample 5 DOJ pages; compare the page date, paragraph numbers and text to
+   `doj.gov.hk`.
+4. Run `verify_citation` and `verify_doj` on known-good and deliberately wrong
+   citations.
+5. Check `corpus_status` / `sync_status` for version dates, last sync, DOJ
+   freshness, and judgment-source provenance.
+6. Re-run `pytest`.
 
 ## Known limitations
 
@@ -164,6 +168,9 @@ Use these in research outputs:
 - Case law coverage depends on the authorised corpus you import; it is not
   exhaustive, and there is no built-in LRS/HKLII crawler.
 - Chinese search uses trigram matching; very short queries fall back to LIKE.
+- DOJ coverage is limited to the Prosecution Code and the domestic-violence
+  prosecution policy. Other DOJ publications, press releases and speeches are
+  not indexed unless added to the seed set.
 - Historical coverage depends on which Past Version archives/languages were
   ingested; commencement timelines are not reconstructed.
 - `sentencing_research` is not a sentencing tariff or a structured sentencing

@@ -20,6 +20,7 @@ retrievable.
 | Current legislation | Indexed locally in English and Traditional Chinese. |
 | Historical legislation | Indexed when the official Past Version archives are downloaded and ingested. |
 | Judgments | Locally indexed from an authorised corpus/feed; coverage equals what you import. No built-in LRS/HKLII crawler. |
+| DOJ policy publications | Prosecution Code and domestic-violence prosecution policy indexed locally from `doj.gov.hk`; policy material, not legislation. |
 | Citator | No. Note-up and authority ranking are research aids, not a citator of record. |
 
 Snapshot: **2026-11-15** (current-version archives plus the English Past
@@ -37,7 +38,8 @@ these fields:
 | `legislation_sections_en` / `legislation_sections_zh` | Current English and Chinese coverage. |
 | `legislation_history_docs` / `legislation_history_sections` | Historical coverage, if the Past Version archives were ingested. |
 | `legislation_history_date_range` | Earliest and latest historical version dates available. |
-| `last_legislation_ingest` / `last_history_ingest` / `last_case_fetch` | Freshness. |
+| `doj_docs` / `doj_paragraphs` | DOJ Prosecution Code and policy coverage. |
+| `last_legislation_ingest` / `last_history_ingest` / `last_case_fetch` / `last_doj_sync` | Freshness. |
 
 Exact counts depend on the archives you ingested. The counts below are the
 reference snapshot, not a guarantee.
@@ -69,6 +71,25 @@ with the source repository.
 These counts depend on which Past Version archives/languages were ingested.
 Traditional Chinese past versions can be added with
 `--dataset past --languages zh-Hant`.
+
+## DOJ policy corpus
+
+The DOJ connector indexes the Prosecution Code and the domestic-violence
+prosecution policy from `doj.gov.hk`. It is a curated, bounded fetch — not a
+crawler. The reference snapshot (English) is:
+
+| Metric | Count |
+|---|---|
+| DOJ documents | 44 |
+| DOJ paragraphs | 558 |
+| Prosecution Code pages | 27 (introduction, chapters 1–24, two appendices) |
+| Domestic-violence policy pages | 17 |
+| Languages | English; `sync-doj --lang zh-Hant` adds the `/tc/` pages |
+| Latest page date in the snapshot | 2020-09-01 |
+
+DOJ material is policy, not legislation or judgment. A paragraph citation such
+as `Prosecution Code §5.9` can be checked with `verify_doj`, but that only
+confirms the paragraph exists locally; read it in context.
 
 ## Core criminal law and procedure
 
@@ -107,6 +128,8 @@ enactment.
 - Repealed sections are skipped; operative sections are kept.
 - Source notes are stored separately from the operative text.
 - Point-in-time lookup with `statute_history(cap, section, as_of)`.
+- DOJ Prosecution Code and domestic-violence prosecution policy pages (policy
+  material, with source URL, page date and checksum).
 
 ### Not included
 
@@ -115,7 +138,9 @@ enactment.
 - Commencement timelines beyond the document/version dates.
 - Editorial notes, annotations, or commentary.
 - Practice directions, court guides, and sentencing guidelines as separate
-  corpora (some may appear in judgments).
+  corpora (some may appear in judgments or the DOJ Prosecution Code).
+- DOJ annual reports, press releases, speeches or other publications outside
+  the Prosecution Code and domestic-violence policy seed set.
 - A prebuilt judgment database.
 - Reported-case series (HKLR, HKC, etc.) not available through HKLII.
 - A citator of record (note-up and authority ranking are research aids only).
@@ -173,6 +198,8 @@ reports local coverage and gaps. See
 - Core penal statutes: Cap. 200, 210, 212, 134, 227, 221, 226, 136.
 - Evidence and procedure: Cap. 8, 221, 227, 4.
 - Constitutional: Basic Law, Cap. 383.
+- DOJ policy: Prosecution Code and domestic-violence policy via `sync-doj`;
+  search with `search_doj` and read with `get_doj_document`.
 - Sentencing: guideline cases in CFA/CA; fetch and cache the key authorities.
 - Offence-specific ordinances as they arise (e.g. firearms, public order,
   immigration, customs, securities, national security).

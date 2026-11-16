@@ -12,6 +12,7 @@ fi
 
 export HK_LAW_DB="${HK_LAW_DB:-$ROOT/data/hk_law.db}"
 export HK_LAW_DATA_DIR="${HK_LAW_DATA_DIR:-$ROOT/data/raw}"
+export HK_LAW_SEMANTIC_MAP="${HK_LAW_SEMANTIC_MAP:-$ROOT/semantic_map/dist/data}"
 # Live HKLII is the default for case search/read so results are current
 # (subject to HKLII terms). Set HK_LAW_LOCAL_ONLY=1 for a local-only MCP.
 export HK_LAW_LOCAL_ONLY="${HK_LAW_LOCAL_ONLY:-0}"

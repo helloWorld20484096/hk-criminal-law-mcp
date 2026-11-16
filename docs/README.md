@@ -20,18 +20,20 @@ that apply to the data.
 | Check source terms, attribution, and reuse rules | [Data sources and licensing](data-sources-and-licensing.md) |
 | Install, edit, or write a defence skill | [Defence skills](../skills/README.md) |
 | Run the server, CLI, or tools | [README: Quick start](../README.md#quick-start) · [MCP tools](../README.md#mcp-tools) |
+| Explore the corpus as a semantic map | [Semantic atlas](../semantic_map/README.md) |
+| Use the MCP from an agent | [Agentic use](agentic-use.md) |
 
 ## Reference
 
 | Document | Answers |
 |---|---|
-| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how case access uses live HKLII and local imports; why legislation is local. |
-| [Fully local pipeline](full-local-pipeline.md) | Incremental legislation sync, judgment import formats, permission-gated citation sync, MCP live default/local-only opt-out, and the systemd timer. |
+| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how DOJ policy pages are fetched; how case access uses live HKLII and local imports; why legislation is local. |
+| [Fully local pipeline](full-local-pipeline.md) | Incremental legislation and DOJ sync, judgment import formats, permission-gated citation sync, MCP live default/local-only opt-out, and the systemd timer. |
 | [Permission request template](permission-request-template.md) | A written request to the Judiciary/HKLII for automated access, with the scope and rate-limit items to settle. |
 | [Public release checklist](public-release.md) | The pre-push audit for judgment text, databases, archives, generated atlas data, and credentials. |
 | [Coverage](coverage.md) | Corpus counts, core criminal Cap. numbers, historical coverage, case-law coverage, and known gaps. |
 | [Reliability model](reliability.md) | Failure modes, verification statuses, provenance, confidence levels, and the audit procedure. |
-| [Data sources and licensing](data-sources-and-licensing.md) | DATA.GOV.HK, Judiciary, and HKLII terms; project licenses; compliance checklist. |
+| [Data sources and licensing](data-sources-and-licensing.md) | DATA.GOV.HK, DOJ, Judiciary, and HKLII terms; project licenses; compliance checklist. |
 | [Defence skills](../skills/README.md) | The 12 workflows, installation, and editing rules. |
 
 ## Documentation conventions

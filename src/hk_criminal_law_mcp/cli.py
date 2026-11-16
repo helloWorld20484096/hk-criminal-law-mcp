@@ -10,6 +10,14 @@ from pathlib import Path
 
 from .config import db_path, DISCLAIMER
 from .db import connect, stats
+from .doj import (
+    doj_status,
+    get_doj_document,
+    list_doj_documents,
+    search_doj,
+    sync_doj,
+    verify_doj_citation,
+)
 from .hklii import get_case_paragraphs, get_judgment, note_up, search_cases
 from .ingest_legislation import (
     download_archives,
@@ -92,6 +100,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-cases", action="store_true", help="Skip case imports/sync"
     )
     sync_p.add_argument(
+        "--no-doj", action="store_true", help="Skip the DOJ publications update"
+    )
+    sync_p.add_argument(
+        "--doj-lang",
+        choices=["en", "zh-Hant"],
+        default="en",
+        help="DOJ language to update (default: en)",
+    )
+    sync_p.add_argument(
+        "--doj-base-url",
+        default=None,
+        help="Override the DOJ base URL (default: HK_LAW_DOJ_BASE)",
+    )
+    sync_p.add_argument(
         "--cases-dir",
         default=None,
         help="Authorised judgment drop folder (or set HK_LAW_CASE_IMPORT_DIR)",
@@ -123,6 +145,55 @@ def build_parser() -> argparse.ArgumentParser:
     import_p.add_argument("--permission-ref", default=None)
 
     sub.add_parser("sync-status", help="Show local coverage and sync freshness")
+
+    sync_doj_p = sub.add_parser(
+        "sync-doj", help="Update the DOJ Prosecution Code and policies"
+    )
+    sync_doj_p.add_argument("--force", action="store_true")
+    sync_doj_p.add_argument("--lang", choices=["en", "zh-Hant"], default="en")
+    sync_doj_p.add_argument("--base-url", default=None)
+
+    search_doj_p = sub.add_parser(
+        "search-doj", help="Search DOJ Prosecution Code and policies"
+    )
+    search_doj_p.add_argument("query")
+    search_doj_p.add_argument(
+        "--category",
+        choices=["prosecution_code", "domestic_violence"],
+        default=None,
+    )
+    search_doj_p.add_argument("--lang", default="en")
+    search_doj_p.add_argument("--limit", type=int, default=8)
+    search_doj_p.add_argument("--text", action="store_true", dest="include_text")
+    search_doj_p.add_argument("--max-chars", type=int, default=4000)
+
+    get_doj_p = sub.add_parser("get-doj", help="Read a DOJ publication")
+    get_doj_p.add_argument("slug")
+    get_doj_p.add_argument("--lang", default="en")
+    get_doj_p.add_argument("--paragraphs", nargs="*")
+    get_doj_p.add_argument("--max-chars", type=int, default=20000)
+
+    list_doj_p = sub.add_parser("list-doj", help="List DOJ publications")
+    list_doj_p.add_argument(
+        "--category",
+        choices=["prosecution_code", "domestic_violence"],
+        default=None,
+    )
+    list_doj_p.add_argument("--lang", default="en")
+    list_doj_p.add_argument("--limit", type=int, default=200)
+
+    verify_doj_p = sub.add_parser(
+        "verify-doj", help="Verify a DOJ policy citation"
+    )
+    verify_doj_p.add_argument("citation")
+    verify_doj_p.add_argument(
+        "--category",
+        choices=["prosecution_code", "domestic_violence"],
+        default=None,
+    )
+    verify_doj_p.add_argument("--lang", default="en")
+
+    sub.add_parser("doj-status", help="Show DOJ coverage and freshness")
 
     ingest = sub.add_parser("ingest", help="Index e-Legislation ZIPs into SQLite")
     ingest.add_argument("--data-dir", default="data/raw")
@@ -310,6 +381,9 @@ def main(argv: list[str] | None = None) -> None:
                 force=args.force,
                 include_legislation=not args.no_legislation,
                 include_cases=not args.no_cases,
+                include_doj=not args.no_doj,
+                doj_language=args.doj_lang,
+                doj_base_url=args.doj_base_url,
                 cases_dir=args.cases_dir,
                 case_format=args.case_format,
                 citations=args.citations,
@@ -343,6 +417,93 @@ def main(argv: list[str] | None = None) -> None:
         conn = connect()
         try:
             _dump({"status": "ok", "sync": sync_status(conn)})
+        finally:
+            conn.close()
+        return
+
+    if args.command == "sync-doj":
+        conn = connect()
+        try:
+            result = sync_doj(
+                conn,
+                force=args.force,
+                language=args.lang,
+                base_url=args.base_url,
+                progress=_progress,
+            )
+            _dump({"status": "ok", **result, "corpus": doj_status(conn)})
+        finally:
+            conn.close()
+        return
+
+    if args.command == "doj-status":
+        conn = connect()
+        try:
+            _dump({"status": "ok", "doj": doj_status(conn)})
+        finally:
+            conn.close()
+        return
+
+    if args.command == "search-doj":
+        conn = connect()
+        try:
+            _dump(
+                search_doj(
+                    conn,
+                    args.query,
+                    category=args.category,
+                    language=args.lang,
+                    limit=args.limit,
+                    include_text=args.include_text,
+                    max_chars=args.max_chars,
+                )
+            )
+        finally:
+            conn.close()
+        return
+
+    if args.command == "get-doj":
+        conn = connect()
+        try:
+            _dump(
+                get_doj_document(
+                    conn,
+                    args.slug,
+                    language=args.lang,
+                    paragraphs=args.paragraphs,
+                    max_chars=args.max_chars,
+                )
+            )
+        finally:
+            conn.close()
+        return
+
+    if args.command == "list-doj":
+        conn = connect()
+        try:
+            _dump(
+                list_doj_documents(
+                    conn,
+                    category=args.category,
+                    language=args.lang,
+                    limit=args.limit,
+                )
+            )
+        finally:
+            conn.close()
+        return
+
+    if args.command == "verify-doj":
+        conn = connect()
+        try:
+            _dump(
+                verify_doj_citation(
+                    conn,
+                    args.citation,
+                    category=args.category,
+                    language=args.lang,
+                )
+            )
         finally:
             conn.close()
         return

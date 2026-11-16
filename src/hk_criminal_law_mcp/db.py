@@ -212,6 +212,73 @@ CREATE TABLE IF NOT EXISTS case_sources (
 
 CREATE INDEX IF NOT EXISTS idx_cases_court_year ON cases(court_code, year);
 CREATE INDEX IF NOT EXISTS idx_cases_judgment_date ON cases(judgment_date);
+
+-- Department of Justice (DOJ) publications. The Probe/Prosecution Code and the
+-- domestic-violence prosecution policy are public policy material, cached
+-- locally for retrieval; they are not legislation and are not judgments.
+CREATE TABLE IF NOT EXISTS doj_docs (
+    id INTEGER PRIMARY KEY,
+    slug TEXT NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT,
+    language TEXT NOT NULL DEFAULT 'en',
+    source_url TEXT NOT NULL,
+    source_file TEXT,
+    version_date TEXT,
+    last_modified TEXT,
+    etag TEXT,
+    checksum TEXT,
+    html TEXT,
+    text TEXT NOT NULL,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (slug, language)
+);
+
+CREATE TABLE IF NOT EXISTS doj_paragraphs (
+    id INTEGER PRIMARY KEY,
+    doc_id INTEGER NOT NULL REFERENCES doj_docs(id) ON DELETE CASCADE,
+    para_no TEXT,
+    heading TEXT,
+    text TEXT NOT NULL,
+    ordinal INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_doj_docs_category
+    ON doj_docs(category, language);
+CREATE INDEX IF NOT EXISTS idx_doj_paragraphs_doc
+    ON doj_paragraphs(doc_id, ordinal);
+CREATE INDEX IF NOT EXISTS idx_doj_paragraphs_no
+    ON doj_paragraphs(para_no);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS doj_fts_en USING fts5(
+    paragraph_id UNINDEXED,
+    doc_id UNINDEXED,
+    slug UNINDEXED,
+    category UNINDEXED,
+    title,
+    heading,
+    text,
+    tokenize = 'porter unicode61'
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS doj_fts_zh USING fts5(
+    paragraph_id UNINDEXED,
+    doc_id UNINDEXED,
+    slug UNINDEXED,
+    category UNINDEXED,
+    title,
+    heading,
+    text,
+    tokenize = 'trigram'
+);
+
+CREATE TABLE IF NOT EXISTS doj_sources (
+    source TEXT PRIMARY KEY,
+    license TEXT,
+    base_url TEXT,
+    last_sync_at TEXT,
+    doc_count INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -265,6 +332,9 @@ def stats(conn: sqlite3.Connection) -> dict:
     cases = one("SELECT COUNT(*) FROM cases")
     paragraphs = one("SELECT COUNT(*) FROM case_paragraphs")
     case_sources = one("SELECT COUNT(*) FROM case_sources")
+    doj_docs = one("SELECT COUNT(*) FROM doj_docs")
+    doj_paragraphs = one("SELECT COUNT(*) FROM doj_paragraphs")
+    doj_sources = one("SELECT COUNT(*) FROM doj_sources")
     sync_runs = one("SELECT COUNT(*) FROM sync_runs")
     en = one("SELECT COUNT(*) FROM legislation_sections WHERE language='en'")
     zh = one("SELECT COUNT(*) FROM legislation_sections WHERE language LIKE 'zh%'")
@@ -290,6 +360,9 @@ def stats(conn: sqlite3.Connection) -> dict:
         "cases": cases,
         "case_paragraphs": paragraphs,
         "case_sources": case_sources,
+        "doj_docs": doj_docs,
+        "doj_paragraphs": doj_paragraphs,
+        "doj_sources": doj_sources,
         "cases_by_court": cases_by_court,
         "sync_runs": sync_runs,
         "last_case_import": one("SELECT MAX(imported_at) FROM case_sources"),
@@ -305,4 +378,8 @@ def stats(conn: sqlite3.Connection) -> dict:
             "SELECT MAX(ingested_at) FROM legislation_history_docs"
         ),
         "last_case_fetch": one("SELECT MAX(fetched_at) FROM cases"),
+        "last_doj_sync": one(
+            "SELECT MAX(finished_at) FROM sync_runs WHERE kind='doj_sync' "
+            "AND status IN ('ok','partial')"
+        ),
     }
