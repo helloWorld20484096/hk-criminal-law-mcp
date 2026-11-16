@@ -4,9 +4,11 @@ A local-first, open-source research stack for **Hong Kong criminal law and
 defence**. It indexes the official current-version Hong Kong legislation XML
 (from DATA.GOV.HK) into SQLite, imports authorised judgment corpora (or fetches
 an explicit permitted citation list), and exposes the corpus to Claude Code
-(or any MCP client) through a small set of citation-aware tools.
+(or any MCP client) through a small set of citation-aware tools. One process
+can also serve the same tools over HTTPS to ChatGPT, Claude, Gemini, DeepSeek
+and a phone browser via `hk-law serve-http`.
 
-Python 3.11+ · Apache-2.0 code · CC BY 4.0 skills/docs · v0.2.0
+Python 3.11+ · Apache-2.0 code · CC BY 4.0 skills/docs · v0.4.0
 
 > [!WARNING]
 > **Not legal advice.** This is a research aid. Every provision and judgment
@@ -26,6 +28,7 @@ Python 3.11+ · Apache-2.0 code · CC BY 4.0 skills/docs · v0.2.0
 > repository. See [Fully local pipeline](docs/full-local-pipeline.md).
 
 **Start here:** [Quick start](#quick-start) ·
+[Use it from a phone or hosted AI](#use-it-from-a-phone-or-a-hosted-ai) ·
 [Use with Claude Code](#use-with-claude-code) · [CLI](#use-from-the-cli) ·
 [MCP tools](#mcp-tools) · [All documentation](docs/README.md)
 
@@ -61,6 +64,7 @@ This is a working MVP, not a complete citator.
 | Citation verification | Single citation + batch passage verification (`verify_citations`); DOJ policy citations with `verify_doj` |
 | Research packs | Doctrine leads, sentencing context, authority ranking, case citation graph |
 | Semantic atlas | Static HTML/WebGL map of all current legislation sections (EN + ZH) |
+| Remote access | Streamable HTTP MCP (`/mcp`), JSON/OpenAPI API, and a mobile web app from one `serve-http` process |
 | Defence workflows | 12 skills under `skills/` |
 
 The **current** corpus is always available. Point-in-time text requires the
@@ -77,7 +81,7 @@ English historical versions / 851,431 sections** (1997–2026); see
 | Source | DATA.GOV.HK e-Legislation XML (current and Past Version archives); DOJ Prosecution Code and prosecution policies |
 | Local corpus | SQLite at `data/hk_law.db`: current legislation + FTS, historical legislation, locally imported judgments + FTS, DOJ policy documents + FTS |
 | Local sync | `hk-law sync`: DATA.GOV.HK legislation updates, DOJ policy updates, and authorised judgment imports; permission-gated HKLII citation fetch |
-| Interfaces | `hk-criminal-law` MCP server (stdio), `hk-law` CLI, and the static semantic atlas |
+| Interfaces | `hk-criminal-law` MCP server (stdio, or Streamable HTTP via `serve-http`), a JSON/OpenAPI API, a mobile web app, `hk-law` CLI, and the static semantic atlas |
 | Live retrieval | Default for case queries: HKLII JSON endpoints; opt out with `HK_LAW_LOCAL_ONLY=1`; bulk sync permission-gated |
 
 The legislation corpus is local. Case search/read uses live HKLII by default so
@@ -242,6 +246,51 @@ Full setup, import schemas, state tables, and the permission boundary:
 
 With the corpus in place, connect the server:
 [Use with Claude Code](#use-with-claude-code).
+
+## Use it from a phone or a hosted AI
+
+The same process can serve the corpus over HTTPS to web assistants and phones:
+
+```bash
+.venv/bin/hk-law serve-http
+# Connect      http://127.0.0.1:8765/connect
+# Web app      http://127.0.0.1:8765/
+# MCP          http://127.0.0.1:8765/mcp
+# REST/OpenAPI http://127.0.0.1:8765/api/  ·  /openapi.json
+```
+
+`/connect` is the plug-and-play page: it detects the deployment mode and gives
+one button per client, copies the MCP URL where a platform cannot prefill it,
+and serves an MCP Registry manifest plus a one-command DeepSeek Harness
+installer.
+
+One endpoint set covers:
+
+| Where you are | What to connect |
+|---|---|
+| Claude web / desktop / mobile | Custom connector → `https://your-host/mcp` (OAuth) |
+| ChatGPT web / mobile | Developer-mode connector → `https://your-host/mcp` (OAuth) |
+| Gemini app / API | Custom MCP connector via OAuth, or `/api/tools?format=gemini` + `/api/call` |
+| DeepSeek Harness | HTTP MCP server via `@deepseek-ai/dsh-mcp-client`; API harnesses use `/api/tools?format=openai` |
+| Any phone browser | `https://your-host/` — a built-in mobile web app, no install |
+| Scripts / custom GPTs | `POST /api/<tool>` or `/openapi-core.json` |
+
+Hosted assistants connect from the provider's cloud, so they need a public
+HTTPS URL. For a public deployment:
+
+```bash
+cp .env.example .env         # set the access key and public URL
+docker compose up -d --build # app on 127.0.0.1:8765
+# put Caddy in front; see deploy/Caddyfile
+```
+
+`HK_LAW_HTTP_ACCESS_KEY` is both the bearer token and the OAuth consent
+password. The server refuses a non-loopback bind without a key unless you
+explicitly opt into anonymous access. For a **public one-click deployment**,
+set `HK_LAW_HTTP_PUBLIC_URL` and `HK_LAW_HTTP_ALLOW_ANONYMOUS=1` with no key:
+OAuth is auto-approved and `/connect` works for everyone. Full per-client
+steps, OAuth details, security notes and troubleshooting are in
+**[Remote access: ChatGPT, Claude, Gemini, DeepSeek and phones](docs/remote-access.md)**.
 
 ## Use with Claude Code
 
@@ -552,6 +601,7 @@ See [docs/coverage.md](docs/coverage.md) for the full coverage picture.
 | Check data terms and attribution | [Data sources and licensing](docs/data-sources-and-licensing.md) |
 | Explore the corpus as a semantic map | [Semantic atlas](semantic_map/README.md) |
 | Use the MCP from an agent | [Agentic use](docs/agentic-use.md) |
+| Use it in ChatGPT, Claude, Gemini, DeepSeek or on a phone | [Remote access](docs/remote-access.md) |
 | Use or edit a defence workflow | [Defence skills](skills/README.md) |
 | See every document | [Documentation index](docs/README.md) |
 

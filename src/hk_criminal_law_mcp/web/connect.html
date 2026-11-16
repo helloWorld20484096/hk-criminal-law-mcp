@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#7a1f2b">
+<title>Connect · HK Criminal Law</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+:root{
+  color-scheme:light dark;
+  --paper:#f7f5f0; --card:#ffffff; --ink:#1d1b18; --muted:#635c50;
+  --line:#e3ddd2; --accent:#7a1f2b; --accent-fill:#7a1f2b; --accent-soft:#f5e8ea;
+  --green:#1e6b45; --green-soft:#e5f2eb; --amber:#8a5a00; --amber-soft:#fbf1da;
+  --radius:16px; --shadow:0 8px 30px rgba(30,24,16,.07);
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --paper:#121212; --card:#1c1b19; --ink:#eeeeec; --muted:#b0a89b;
+    --line:#33302b; --accent:#e08a96; --accent-fill:#a63a4a; --accent-soft:#3a1d1f;
+    --green:#7ec9a2; --green-soft:#1d3328; --amber:#e4bb6a; --amber-soft:#332a17;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--paper)}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang HK","Noto Sans TC",sans-serif;
+  min-height:100dvh;padding-bottom:env(safe-area-inset-bottom)}
+a{color:var(--accent)}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+header.top{padding-top:env(safe-area-inset-top);border-bottom:1px solid var(--line);
+  background:var(--paper);position:sticky;top:0;z-index:10}
+.top-inner{display:flex;align-items:center;gap:12px;padding-top:12px;padding-bottom:12px}
+.mark{width:42px;height:42px;border-radius:12px;background:var(--accent-fill);color:#fff;
+  display:grid;place-items:center;font:700 15px/1 Georgia,"Noto Serif TC",serif}
+.brand{min-width:0}
+.brand h1{margin:0;font:600 19px/1.15 Georgia,"Noto Serif TC",serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.top-inner .spacer{flex:1}
+.top-inner .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;
+  padding:8px 11px;font-size:13px;font-weight:600;text-decoration:none;color:var(--ink);white-space:nowrap;flex:none}
+
+main{padding:26px 0 40px}
+.eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
+.hero h1{margin:0;font:600 clamp(28px,5vw,42px)/1.12 Georgia,"Noto Serif TC",serif;letter-spacing:-.01em}
+.lede{color:var(--muted);font-size:16.5px;max-width:62ch;margin:10px 0 0}
+.status{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:7px 12px;border-radius:999px;
+  background:var(--green-soft);color:var(--green);font-size:13px;font-weight:700}
+.status.key{background:var(--amber-soft);color:var(--amber)}
+.status.local{background:var(--accent-soft);color:var(--accent)}
+.status .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.urlbox{display:flex;align-items:center;gap:8px;margin-top:18px;background:var(--card);
+  border:1px solid var(--line);border-radius:14px;padding:10px 10px 10px 14px;box-shadow:var(--shadow)}
+.urlbox code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:600 14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:11px;
+  border:1px solid var(--line);background:var(--card);color:var(--ink);padding:11px 15px;
+  font-size:14.5px;font-weight:700;text-decoration:none;cursor:pointer;min-height:44px}
+.btn.primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+.btn.small{padding:9px 12px;font-size:13.5px;min-height:38px}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.55}
+
+.grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:26px}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+.client{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;
+  display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.client-head{display:flex;align-items:center;gap:10px}
+.logo{width:22px;height:22px;display:grid;place-items:center;font-weight:800;
+  background:none;color:var(--accent);font-size:18px;flex:none}
+.client h2{margin:0;font:600 19px/1.2 Georgia,"Noto Serif TC",serif}
+.client p{margin:0;color:var(--muted);font-size:14px;flex:1}
+.client .actions{display:flex;gap:8px;flex-wrap:wrap}
+.client code{font-size:12.5px;overflow-wrap:anywhere}
+details{border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--accent)}
+details p,details li{font-size:13.5px;color:var(--muted)}
+details ol{padding-left:20px;margin:8px 0}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;
+  overflow:auto;font-size:12.5px;line-height:1.5;margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+pre code{font-size:inherit}
+.section-title{margin:32px 0 10px;font:600 22px/1.25 Georgia,"Noto Serif TC",serif}
+.alt{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;
+  box-shadow:var(--shadow)}
+.alt h3{margin:0 0 4px;font-size:15px}
+.alt p{margin:0 0 8px;color:var(--muted);font-size:13.5px}
+.alt .row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.alt .divider{height:1px;background:var(--line);margin:16px 0}
+.note{margin-top:22px;padding:14px 16px;border-radius:12px;background:var(--amber-soft);
+  color:var(--amber);font-size:13.5px;line-height:1.55}
+.note.open{background:var(--green-soft);color:var(--green)}
+footer{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+footer p{margin:0 0 5px}
+#toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(8px);
+  background:var(--ink);color:var(--paper);padding:10px 15px;border-radius:999px;font-size:13.5px;font-weight:650;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:50;max-width:calc(100vw - 32px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="mark" aria-hidden="true">HK</div>
+    <div class="brand">
+      <h1>HK Criminal Law</h1>
+      <p>Connect in one click</p>
+    </div>
+    <span class="spacer"></span>
+    <a class="chip" href="/">Open web app</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Plug and play</p>
+    <h1>Bring Hong Kong law into the assistant you already use.</h1>
+    <p class="lede">Add this server once. Claude, ChatGPT and Gemini use the standard MCP
+      OAuth flow; DeepSeek Harness has a one-command installer. The phone web app needs no setup.</p>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Checking this deployment…</span></div>
+    <div class="urlbox">
+      <code id="mcpUrl">/mcp</code>
+      <button class="btn small" id="copyUrl" type="button">Copy</button>
+    </div>
+  </section>
+
+  <section class="grid" aria-label="Clients">
+    <article class="client">
+      <div class="client-head"><span class="logo">✳</span><h2>Claude</h2></div>
+      <p>Opens Claude's connector dialog with this server's name and URL filled in.</p>
+      <div class="actions">
+        <a class="btn primary" id="claudeBtn" href="https://claude.ai/customize/connectors" target="_blank" rel="noopener">Add to Claude</a>
+        <button class="btn small" type="button" data-copy="mcp">Copy URL</button>
+      </div>
+      <details>
+        <summary>If the button does not prefill</summary>
+        <ol>
+          <li>Settings → Connectors → Add custom connector.</li>
+          <li>Name: <strong>HK Criminal Law</strong>.</li>
+          <li>URL: the address above, ending in <code>/mcp</code>.</li>
+          <li>Choose OAuth and approve. On a public deployment this is automatic.</li>
+        </ol>
+      </details>
+    </article>
+
+    <article class="client">
+      <div class="client-head"><span class="logo">◎</span><h2>ChatGPT</h2></div>
+      <p>Opens the developer-mode connector form and copies the MCP URL for you.</p>
+      <div class="actions">
+        <a class="btn primary" id="chatgptBtn" href="https://chatgpt.com/plugins" target="_blank" rel="noopener">Add to ChatGPT</a>
+        <button class="btn small" type="button" data-copy="mcp">Copy URL</button>
+      </div>
+      <details>
+        <summary>Exact steps</summary>
+        <ol>
+          <li>Enable Developer mode: Settings → Apps &amp; Connectors → Advanced settings.</li>
+          <li>Apps &amp; Connectors → Create.</li>
+          <li>Paste the copied URL into <strong>MCP Server URL</strong>.</li>
+          <li>Choose OAuth. On an open deployment the authorization is automatic.</li>
+          <li>Enable the connector in each chat from the <strong>+</strong> menu.</li>
+        </ol>
+        <p>For a link your users can open in one click, publish a custom GPT with the
+          <a href="/openapi-core.json">core OpenAPI schema</a> once and share the GPT link.</p>
+      </details>
+    </article>
+
+    <article class="client">
+      <div class="client-head"><span class="logo">✦</span><h2>Gemini</h2></div>
+      <p>Opens Gemini's connected-apps screen and copies the MCP URL. Gemini has no
+        public prefill link yet, so paste it into <strong>+ Custom</strong>.</p>
+      <div class="actions">
+        <a class="btn primary" id="geminiBtn" href="https://gemini.google.com/customize/connectors" target="_blank" rel="noopener">Open Gemini connectors</a>
+        <button class="btn small" type="button" data-copy="mcp">Copy URL</button>
+      </div>
+      <details>
+        <summary>Exact steps and CLI fallback</summary>
+        <ol>
+          <li>Settings → Connected Apps → Connectors → <strong>+ Custom</strong>.</li>
+          <li>Paste the URL, leave client ID/secret blank, choose Next.</li>
+          <li>Complete OAuth and start a new chat. Type <code>@</code> to select the app.</li>
+        </ol>
+        <p>Gemini CLI: <code id="geminiCli">gemini mcp add --transport http hk-law …</code></p>
+      </details>
+    </article>
+
+    <article class="client">
+      <div class="client-head"><span class="logo">⌁</span><h2>DeepSeek Harness</h2></div>
+      <p>One command installs the official MCP client plugin and adds this server to
+        <code>~/.dsh/cordis.patch.yml</code>.</p>
+      <div class="actions">
+        <button class="btn primary" type="button" id="copyDsh">Copy install command</button>
+        <a class="btn small" href="/connect/dsh.sh" target="_blank" rel="noopener">View script</a>
+      </div>
+      <pre><code id="dshCmd">curl -fsSL …/connect/dsh.sh | bash</code></pre>
+      <details>
+        <summary>What the script does</summary>
+        <p>Installs <code>@deepseek-ai/dsh-mcp-client</code> into the <code>web</code> profile,
+          backs up your config, and appends an <code>mcp-hk-law</code> server entry. Restart
+          <code>dsh web</code> afterwards. Set <code>DSH_PROFILE</code> for another profile.</p>
+      </details>
+    </article>
+
+    <article class="client">
+      <div class="client-head"><span class="logo">▤</span><h2>Phone or browser</h2></div>
+      <p>The built-in web app needs no key on an open deployment and no install anywhere.
+        Add it to your home screen for an app-like shortcut.</p>
+      <div class="actions">
+        <a class="btn primary" href="/">Open the web app</a>
+        <button class="btn small" type="button" data-copy="mcp">Copy MCP URL</button>
+      </div>
+      <details>
+        <summary>Make it feel like an app</summary>
+        <p>In Safari: Share → Add to Home Screen. In Chrome: menu → Add to Home screen.
+          The access key, if one is required, is stored only in that browser.</p>
+      </details>
+    </article>
+
+    <article class="client">
+      <div class="client-head"><span class="logo">⌘</span><h2>Any MCP client</h2></div>
+      <p>Anything that speaks Streamable HTTP can connect. OAuth is standard; a bearer
+        header works for harnesses that only support headers.</p>
+      <div class="actions">
+        <button class="btn primary" type="button" data-copy="json">Copy JSON config</button>
+        <a class="btn small" href="/server.json" target="_blank" rel="noopener">server.json</a>
+      </div>
+      <pre><code id="jsonConfig">{}</code></pre>
+      <details>
+        <summary>Claude Code and Gemini CLI</summary>
+        <p>Claude Code: <code id="claudeCli">claude mcp add --transport http hk-criminal-law …</code></p>
+        <p>Gemini CLI: <code id="geminiCli2">gemini mcp add --transport http hk-law …</code></p>
+      </details>
+    </article>
+  </section>
+
+  <h2 class="section-title">Other install paths</h2>
+  <section class="alt">
+    <h3>Universal installer</h3>
+    <p>The server publishes an MCP Registry manifest. Third-party installers can read it
+      and offer their own buttons.</p>
+    <div class="row">
+      <a class="btn small" id="universalBtn" href="#" target="_blank" rel="noopener">Try universal installer (third-party)</a>
+      <a class="btn small" href="/server.json" target="_blank" rel="noopener">Open manifest</a>
+    </div>
+    <div class="divider"></div>
+    <h3>For the operator</h3>
+    <p>Publish once for a true one-click experience: add a Claude connector to the directory,
+      publish a ChatGPT app/custom GPT, or register a Gemini connected app. The
+      <a href="https://github.com/helloWorld20484096/hk-criminal-law-mcp/blob/main/docs/remote-access.md">remote-access guide</a>
+      lists the requirements and the manifest to submit.</p>
+    <div class="divider"></div>
+    <h3>No public server?</h3>
+    <p>Expose your local instance with a tunnel, then use this page from the tunnel URL:</p>
+    <pre><code>cloudflared tunnel --url http://127.0.0.1:8765</code></pre>
+  </section>
+
+  <div class="note" id="deploymentNote" hidden></div>
+
+  <footer>
+    <p>Research assistance only, not legal advice. Verify every provision and judgment
+      against the official source.</p>
+    <p><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/">Web app</a> ·
+      <a href="/openapi.json">API schema</a> · <a href="/healthz">Health</a></p>
+  </footer>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+const origin = location.origin;
+const mcpUrl = origin + "/mcp";
+const appState = {meta: null};
+
+const $ = (id) => document.getElementById(id);
+
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => el.classList.remove("show"), 2400);
+}
+
+async function copyText(text, message) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    toast(message || "Copied");
+  } catch (error) {
+    toast("Copy failed");
+  }
+}
+
+function openAfterCopy(url, message) {
+  // Open synchronously so the browser does not treat it as a popup, then copy.
+  window.open(url, "_blank", "noopener");
+  copyText(mcpUrl, message);
+}
+
+function buildConfig() {
+  const server = {type: "http", url: mcpUrl};
+  if (appState.meta && appState.meta.oauth_open) {
+    server.headers = {
+      Authorization: "Bearer " + (appState.meta.open_access_token || "open-access")
+    };
+  } else if (appState.meta && appState.meta.auth_required) {
+    server.headers = {Authorization: "Bearer YOUR_ACCESS_KEY"};
+  }
+  return JSON.stringify({mcpServers: {"hk-criminal-law": server}}, null, 2);
+}
+
+function update() {
+  $("mcpUrl").textContent = mcpUrl;
+  const open = !!(appState.meta && appState.meta.oauth_open);
+  const key = !!(appState.meta && appState.meta.auth_required);
+  const oauth = !!(appState.meta && appState.meta.oauth);
+  const status = $("status");
+  status.classList.remove("key", "local");
+  if (open) {
+    $("statusText").textContent = "Open access — no key needed";
+    $("deploymentNote").hidden = false;
+    $("deploymentNote").className = "note open";
+    $("deploymentNote").textContent =
+      "This is a deliberately public deployment. Anyone with the URL can query the read-only corpus. " +
+      "MCP clients that cannot do OAuth can send 'Authorization: Bearer " +
+      (appState.meta.open_access_token || "open-access") + "'.";
+  } else if (key) {
+    $("statusText").textContent = "Access key required";
+    status.classList.add("key");
+    $("deploymentNote").hidden = false;
+    $("deploymentNote").className = "note";
+    $("deploymentNote").textContent = oauth
+      ? "Ask the operator for the deployment access key. Do not put it in a URL: " +
+        "paste it into the OAuth consent page or the client's header field."
+      : "Ask the operator for the deployment access key and send it as " +
+        "'Authorization: Bearer <key>'. OAuth is off on this deployment, so " +
+        "hosted assistants (Claude/ChatGPT/Gemini) need a public URL before they " +
+        "can connect; use the web app or a header-capable MCP client for now.";
+  } else if (oauth) {
+    $("statusText").textContent = "OAuth is available.";
+  } else {
+    $("statusText").textContent = "Local anonymous access. Hosted assistants need a public HTTPS URL.";
+    status.classList.add("local");
+  }
+
+  const claude = "https://claude.ai/customize/connectors/new?name=" +
+    encodeURIComponent("HK Criminal Law") +
+    "&url=" + encodeURIComponent(mcpUrl) +
+    "&transport=http&auth=oauth";
+  $("claudeBtn").href = claude;
+
+  const chatgpt = "https://chatgpt.com/plugins#settings/Connectors?create-connector=true" +
+    "&redirectAfter=%2Fplugins&url=" + encodeURIComponent(mcpUrl);
+  $("chatgptBtn").href = chatgpt;
+
+  $("dshCmd").textContent = key
+    ? "export HK_LAW_KEY='<ask the operator>'\ncurl -fsSL " + origin + "/connect/dsh.sh | bash"
+    : "curl -fsSL " + origin + "/connect/dsh.sh | bash";
+
+  $("jsonConfig").textContent = buildConfig();
+  $("claudeCli").textContent = "claude mcp add --transport http hk-criminal-law " + mcpUrl;
+  $("geminiCli").textContent = "gemini mcp add --transport http hk-law " + mcpUrl;
+  $("geminiCli2").textContent = "gemini mcp add --transport http hk-law " + mcpUrl;
+
+  $("universalBtn").href = "https://install.apicommons.org/?server=" +
+    encodeURIComponent(origin + "/server.json");
+}
+
+async function loadMeta() {
+  try {
+    const response = await fetch("/api/meta");
+    appState.meta = await response.json();
+  } catch (error) {
+    appState.meta = null;
+  }
+  update();
+}
+
+$("copyUrl").addEventListener("click", () => copyText(mcpUrl, "MCP URL copied"));
+document.querySelectorAll("[data-copy]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const kind = button.getAttribute("data-copy");
+    copyText(kind === "json" ? buildConfig() : mcpUrl,
+      kind === "json" ? "JSON config copied" : "MCP URL copied");
+  });
+});
+
+const popupHint = "URL copied — if no tab opened, allow pop-ups and try again";
+$("claudeBtn").addEventListener("click", (event) => {
+  event.preventDefault();
+  openAfterCopy($("claudeBtn").href, popupHint + " (Claude should prefill it)");
+});
+$("chatgptBtn").addEventListener("click", (event) => {
+  event.preventDefault();
+  openAfterCopy($("chatgptBtn").href, popupHint + " (paste into the form)");
+});
+$("geminiBtn").addEventListener("click", (event) => {
+  event.preventDefault();
+  openAfterCopy($("geminiBtn").href, popupHint + " (paste into + Custom)");
+});
+$("copyDsh").addEventListener("click", () => {
+  copyText($("dshCmd").textContent, "Install command copied");
+});
+
+loadMeta();
+</script>
+</body>
+</html>

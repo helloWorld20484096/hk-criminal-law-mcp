@@ -25,11 +25,22 @@ All modules live under `src/hk_criminal_law_mcp/`.
 - **`sync.py`** — Incremental legislation sync, DOJ sync, authorised judgment
   import, permission-gated citation sync, and sync status.
 - **`research.py`** — Doctrine/sentencing/authority/citation-graph packs.
-- **`server.py`** — MCP tools (FastMCP/MCPServer, stdio).
+- **`server.py`** — MCP tools (FastMCP/MCPServer, stdio) and the shared
+  `TOOL_FUNCTIONS` table used by every interface.
 - **`cli.py`** — `hk-law` command line.
+- **`http_server.py`** — Remote HTTP app: Streamable HTTP MCP at `/mcp`, JSON
+  API at `/api/<tool>`, OpenAPI at `/openapi.json`, health/meta endpoints, and
+  the mobile web app at `/`. It builds a second `MCPServer` instance and
+  registers the same `TOOL_FUNCTIONS`.
+- **`oauth_server.py`** — Single-operator OAuth 2.1 provider (dynamic client
+  registration, PKCE, consent, refresh tokens) for hosted assistants.
+- **`web/index.html`** — The packaged, dependency-free mobile web app.
 
-The MCP server is a thin layer over SQLite and the HKLII client. It has no
-server-side state beyond the SQLite file and the local cache.
+The stdio MCP server is a thin layer over SQLite and the HKLII client. It has
+no server-side state beyond the SQLite file and the local cache. The remote
+server adds only a rate limiter and OAuth token state (in
+`$HK_LAW_HOME/oauth_state.json`); it is designed to run as one process against
+one SQLite database.
 
 ## Data flow
 
@@ -119,6 +130,36 @@ explicitly refreshed.
 5. The run is recorded in `sync_runs`; archive validators are stored in `meta`.
 6. `hk-law import-cases` or the permission-gated citation sync updates the
    local judgment corpus and `case_sources`.
+
+### Remote HTTP surface
+
+`hk-law serve-http` (or `python -m hk_criminal_law_mcp.http_server`) wraps the
+same tool functions in one ASGI app:
+
+1. A new `MCPServer` is constructed (so auth settings are per-process) and
+   every entry in `TOOL_FUNCTIONS` is registered, except `sync_doj` by default.
+2. `streamable_http_app()` supplies the `/mcp` transport and its OAuth
+   resource-metadata route; the app's router is extended with the REST, schema,
+   health and web-app routes.
+3. Middleware adds bearer-key authentication (skipped for `/mcp` when OAuth is
+   enabled, because the MCP SDK enforces it), an in-process rate limit,
+   security headers/CSP, and optional CORS.
+4. The app also serves `/connect` (one-click setup), `/connect/dsh.sh` (DeepSeek
+   Harness installer), `/server.json` + `/.well-known/mcp/server.json` (MCP
+   Registry manifest), and `/privacy` / `/terms`.
+5. `create_app()` is a pure factory: tests pass `HTTPSettings` directly and do
+   not mutate process environment variables.
+
+OAuth runs in two modes. With an access key, `/authorize` redirects to a consent
+page that requires the key. In **open mode** (public URL + anonymous access, no
+key), the provider mints the authorization code immediately and redirects back
+to the client, so hosted assistants connect without an operator. Header-only
+MCP clients use the non-secret `open-access` bearer value in that mode.
+
+The REST layer binds arguments with `inspect.signature`, runs synchronous
+tools in Starlette's thread pool, and attaches the disclaimer. It never accepts
+an arbitrary callable name: only `TOOL_FUNCTIONS` entries present in the remote
+set can run.
 
 ## SQLite schema
 

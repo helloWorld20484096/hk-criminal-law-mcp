@@ -149,6 +149,27 @@ discover cases. The LRS adapter is not wired until the permission letter
 specifies the permitted URL pattern, scope, and rate limit. The written request
 template is [here](permission-request-template.md).
 
+## Publishing a remote endpoint
+
+`hk-law serve-http` lets other people query your local corpus. That does not
+change the source terms, and it makes **you** the operator of a service.
+
+- **Do not run an open, public endpoint over a corpus that contains judgment
+  text you may not redistribute.** The remote surface can return any locally
+  imported judgment to any authenticated caller. Keep such deployments private,
+  or keep judgments out of the corpus.
+- **Prefer `HK_LAW_LOCAL_ONLY=1` for a public deployment.** Live HKLII access is
+  intended for individual, rate-limited research. A public multi-user service
+  that proxies HKLII at scale needs its own permission and terms review.
+- **Keep the rate limiter and the disclaimer.** Do not remove the provenance
+  fields or the warning that search snippets are not the provision.
+- **Protect the endpoint.** Use an access key and HTTPS, and do not publish the
+  SQLite volume. An anonymous endpoint is a deliberate choice, not a default.
+- **Logs and queries.** Reverse proxies and application logs may record user
+  queries. Treat them as confidential research material.
+
+See [Remote access](remote-access.md) for the deployment controls.
+
 ## Project licenses
 
 - **Code** (`src/`, `tests/`, `scripts/`): Apache License 2.0 — see `LICENSE`.

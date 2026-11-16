@@ -48,6 +48,23 @@ In local-only mode a missing judgment is a coverage gap, not a negative
 finding; report it and do not fabricate a citation. In live mode a HKLII
 failure falls back to local results with `live_error`.
 
+## Remote MCP and hosted assistants
+
+`hk-law serve-http` exposes the same tools over Streamable HTTP at `/mcp`, plus
+a JSON API (`/api/<tool>`), an OpenAPI schema (`/openapi.json`) and a mobile web
+app (`/`). This is the path for ChatGPT, Claude web/mobile, Gemini, DeepSeek
+Harness and phones; it is not required for Claude Code.
+
+See [Remote access](remote-access.md) for per-client setup, OAuth, deployment
+and security. The short version:
+
+```bash
+.venv/bin/hk-law serve-http --access-key "$KEY" --public-url https://your-host
+```
+
+Point an MCP client at `https://your-host/mcp` with
+`Authorization: Bearer $KEY`, or use OAuth.
+
 ## External agents
 
 The server is a standard stdio MCP server. Point any MCP-capable agent host at
@@ -91,3 +108,8 @@ generated.
 - Every provision and judgment must be checked against the official source
   before it is relied on.
 - The server is not legal advice.
+
+## Related
+
+[Remote access: ChatGPT, Claude, Gemini, DeepSeek and phones](remote-access.md) ·
+[Architecture](architecture.md) · [README](../README.md)

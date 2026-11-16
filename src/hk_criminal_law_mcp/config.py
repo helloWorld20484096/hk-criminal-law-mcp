@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "hk-criminal-law-mcp"
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # Public endpoints. These are free-to-access sources, subject to their own terms.
 HKLII_BASE = os.environ.get("HK_LAW_HKLII_BASE", "https://www.hklii.hk").rstrip("/")
