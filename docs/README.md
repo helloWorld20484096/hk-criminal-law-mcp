@@ -22,6 +22,7 @@ that apply to the data.
 | Run the server, CLI, or tools | [README: Quick start](../README.md#quick-start) · [MCP tools](../README.md#mcp-tools) |
 | Explore the corpus as a semantic map | [Semantic atlas](../semantic_map/README.md) |
 | Use the MCP from an agent | [Agentic use](agentic-use.md) |
+| Use it in ChatGPT, Claude, Gemini, DeepSeek or on a phone | [Remote access](remote-access.md) |
 
 ## Reference
 
@@ -34,6 +35,7 @@ that apply to the data.
 | [Coverage](coverage.md) | Corpus counts, core criminal Cap. numbers, historical coverage, case-law coverage, and known gaps. |
 | [Reliability model](reliability.md) | Failure modes, verification statuses, provenance, confidence levels, and the audit procedure. |
 | [Data sources and licensing](data-sources-and-licensing.md) | DATA.GOV.HK, DOJ, Judiciary, and HKLII terms; project licenses; compliance checklist. |
+| [Remote access](remote-access.md) | MCP over Streamable HTTP, OAuth, the JSON/OpenAPI API, the mobile web app, per-client setup, and deployment. |
 | [Defence skills](../skills/README.md) | The 12 workflows, installation, and editing rules. |
 
 ## Documentation conventions
@@ -49,5 +51,6 @@ that apply to the data.
 ## Related
 
 [README](../README.md) · [Architecture](architecture.md) ·
-[Coverage](coverage.md) · [Reliability](reliability.md) ·
-[Data sources](data-sources-and-licensing.md) · [Skills](../skills/README.md)
+[Remote access](remote-access.md) · [Coverage](coverage.md) ·
+[Reliability](reliability.md) · [Data sources](data-sources-and-licensing.md) ·
+[Skills](../skills/README.md)

@@ -1,0 +1,35 @@
+services:
+  hk-law:
+    build: .
+    image: hk-criminal-law-mcp:0.4.0
+    restart: unless-stopped
+    environment:
+      # A non-loopback bind fails closed without a key unless you opt in to
+      # anonymous access. Set these in .env or the shell.
+      HK_LAW_HTTP_ACCESS_KEY: ${HK_LAW_HTTP_ACCESS_KEY:-}
+      HK_LAW_HTTP_PUBLIC_URL: ${HK_LAW_HTTP_PUBLIC_URL:-}
+      HK_LAW_HTTP_ALLOW_ANONYMOUS: ${HK_LAW_HTTP_ALLOW_ANONYMOUS:-0}
+      HK_LAW_HTTP_RATE_LIMIT: ${HK_LAW_HTTP_RATE_LIMIT:-120}
+      HK_LAW_HTTP_RATE_WINDOW: ${HK_LAW_HTTP_RATE_WINDOW:-60}
+      HK_LAW_HTTP_TRUST_PROXY: ${HK_LAW_HTTP_TRUST_PROXY:-1}
+      HK_LAW_HTTP_ALLOWED_HOSTS: ${HK_LAW_HTTP_ALLOWED_HOSTS:-}
+      HK_LAW_HTTP_ALLOWED_ORIGINS: ${HK_LAW_HTTP_ALLOWED_ORIGINS:-}
+      HK_LAW_HTTP_ALLOW_SYNC: ${HK_LAW_HTTP_ALLOW_SYNC:-0}
+      HK_LAW_LOCAL_ONLY: ${HK_LAW_LOCAL_ONLY:-0}
+      HK_LAW_CASE_PERMISSION_REF: ${HK_LAW_CASE_PERMISSION_REF:-}
+      HK_LAW_CASE_CITATIONS: ${HK_LAW_CASE_CITATIONS:-}
+      HK_LAW_SEMANTIC_MAP: ${HK_LAW_SEMANTIC_MAP:-/semantic_map/data}
+    volumes:
+      # The corpus and OAuth state live here; build the DB first.
+      - ./data:/data
+      # Optional semantic atlas (uncomment after running `make map-all`).
+      # - ./semantic_map/dist/data:/semantic_map/data:ro
+    ports:
+      # Keep the app on loopback and put Caddy/nginx in front for HTTPS.
+      - "127.0.0.1:8765:8765"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

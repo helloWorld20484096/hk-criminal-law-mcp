@@ -1,4 +1,4 @@
-.PHONY: setup download ingest ingest-en ingest-zh sync-doj test serve stats skills \
+.PHONY: setup download ingest ingest-en ingest-zh sync-doj test serve serve-http stats skills \
 	map-export map-embed map-reduce map-label map-diagnostics map-site map-check map-serve map-all map-smoke
 
 setup:
@@ -24,6 +24,9 @@ test:
 
 serve:
 	.venv/bin/hk-law serve
+
+serve-http:
+	HK_LAW_DB="$${HK_LAW_DB:-$(CURDIR)/data/hk_law.db}" .venv/bin/hk-law serve-http
 
 stats:
 	.venv/bin/hk-law stats

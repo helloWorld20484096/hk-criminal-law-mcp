@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from mcp.types import ToolAnnotations
+
 try:  # MCP SDK 1.x
     from mcp.server.fastmcp import FastMCP as _MCPServer
 except ImportError:  # MCP SDK 2.x renamed FastMCP to MCPServer
@@ -44,22 +46,34 @@ from .search import (
     verify_citations as _verify_citations,
 )
 
-mcp = _MCPServer(
-    "hk-criminal-law",
-    instructions=(
-        "Hong Kong criminal law and defence research. This server is local-first: "
-        "search_cases and get_case read the local corpus by default; live HKLII "
-        "or LRS retrieval is available only when a permitted source is configured "
-        "and the caller explicitly opts in. Agent protocol: call corpus_status or "
-        "sync_status first; search the DOJ Prosecution Code and prosecution "
-        "policies with search_doj and read them with get_doj_document; use "
-        "semantic_search and semantic_neighbors for discovery, then get_section, "
-        "statute_history, search_cases, and get_case_paragraphs for primary text; "
-        "run verify_citations (and verify_doj for DOJ policy citations) before "
-        "relying on anything; label anything unverified [UNVERIFIED]. The "
-        "semantic atlas is a discovery aid, not authority. This server is a "
-        "retrieval aid, not a citator of record and not legal advice."
-    ),
+INSTRUCTIONS = (
+    "Hong Kong criminal law and defence research. Case search/read follows the "
+    "deployment: local-only when HK_LAW_LOCAL_ONLY=1, otherwise live HKLII "
+    "query-time access with a local fallback; live access remains subject to "
+    "the source's terms. Agent protocol: call corpus_status or sync_status "
+    "first; search the DOJ Prosecution Code and prosecution policies with "
+    "search_doj and read them with get_doj_document; use semantic_search and "
+    "semantic_neighbors for discovery, then get_section, statute_history, "
+    "search_cases, and get_case_paragraphs for primary text; run "
+    "verify_citations (and verify_doj for DOJ policy citations) before relying "
+    "on anything; label anything unverified [UNVERIFIED]. The semantic atlas "
+    "is a discovery aid, not authority. This server is a retrieval aid, not a "
+    "citator of record and not legal advice."
+)
+
+mcp = _MCPServer("hk-criminal-law", instructions=INSTRUCTIONS)
+
+# Tool annotations are hints for clients (notably ChatGPT, which prompts before
+# write-like tools). The research tools do not change the caller's environment;
+# only sync_doj updates the local corpus. "Live" tools may contact HKLII.
+READ_LOCAL = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+READ_LIVE = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+)
+WRITE_LIVE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
 )
 
 
@@ -72,7 +86,7 @@ def _ok(payload: dict) -> dict:
     return payload
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def search_legislation(
     query: str,
     cap: str | None = None,
@@ -99,7 +113,7 @@ def search_legislation(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def get_section(
     cap: str, section: str, lang: str = "en", max_chars: int = 20000
 ) -> dict:
@@ -118,7 +132,7 @@ def get_section(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def get_section_range(
     cap: str,
     start: str,
@@ -141,7 +155,7 @@ def get_section_range(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def statute_history(
     cap: str,
     section: str,
@@ -164,7 +178,7 @@ def statute_history(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def list_section_versions(cap: str, section: str, lang: str = "en") -> dict:
     """List all historical version dates available for a section."""
     conn = _db()
@@ -174,7 +188,7 @@ def list_section_versions(cap: str, section: str, lang: str = "en") -> dict:
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def list_ordinances(query: str | None = None, lang: str = "en", limit: int = 200) -> dict:
     """List indexed ordinances/regulations, optionally filtered by title or Cap."""
     conn = _db()
@@ -184,7 +198,7 @@ def list_ordinances(query: str | None = None, lang: str = "en", limit: int = 200
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def search_cases(
     query: str,
     court: str | None = None,
@@ -214,7 +228,7 @@ def search_cases(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def get_case(
     citation: str,
     lang: str = "en",
@@ -256,7 +270,7 @@ def get_case(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def get_case_paragraphs(
     citation: str,
     paragraphs: list[str],
@@ -280,7 +294,7 @@ def get_case_paragraphs(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def note_up(
     citation: str, force: bool = False, allow_live: bool | None = None
 ) -> dict:
@@ -300,7 +314,7 @@ def note_up(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def verify_citation(
     citation: str, lang: str = "en", live: bool | None = None
 ) -> dict:
@@ -318,7 +332,7 @@ def verify_citation(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def verify_citations(
     text: str, lang: str = "en", live: bool | None = None
 ) -> dict:
@@ -335,7 +349,7 @@ def verify_citations(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def doctrine_research(
     query: str,
     lang: str = "en",
@@ -362,7 +376,7 @@ def doctrine_research(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def sentencing_research(
     cap: str,
     section: str,
@@ -387,7 +401,7 @@ def sentencing_research(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def authority_ranking(
     query: str,
     court: str | None = None,
@@ -411,7 +425,7 @@ def authority_ranking(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LIVE)
 def case_graph(
     citation: str,
     lang: str = "en",
@@ -431,7 +445,7 @@ def case_graph(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def corpus_status() -> dict:
     """Report database size, coverage, sync freshness, and local-only mode."""
     conn = _db()
@@ -441,7 +455,7 @@ def corpus_status() -> dict:
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def sync_status() -> dict:
     """Report local coverage, last sync runs, and permission configuration."""
     conn = _db()
@@ -456,7 +470,7 @@ def sync_status() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def search_doj(
     query: str,
     category: str | None = None,
@@ -489,7 +503,7 @@ def search_doj(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def get_doj_document(
     slug: str,
     lang: str = "en",
@@ -520,7 +534,7 @@ def get_doj_document(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def list_doj_documents(
     category: str | None = None, lang: str = "en", limit: int = 200
 ) -> dict:
@@ -536,7 +550,7 @@ def list_doj_documents(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def verify_doj(
     citation: str, category: str | None = None, lang: str = "en"
 ) -> dict:
@@ -556,7 +570,7 @@ def verify_doj(
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def doj_status() -> dict:
     """Report DOJ corpus coverage, freshness and provenance."""
     conn = _db()
@@ -566,7 +580,7 @@ def doj_status() -> dict:
         conn.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=WRITE_LIVE)
 def sync_doj(force: bool = False, lang: str = "en") -> dict:
     """Incrementally update the local DOJ corpus.
 
@@ -596,7 +610,7 @@ def _semantic_payload(index):
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_status() -> dict:
     """Report whether the semantic atlas is available and what it covers."""
     index, error = _semantic_payload(_get_semantic_index())
@@ -605,7 +619,7 @@ def semantic_status() -> dict:
     return _ok(index.status())
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_search(
     query: str,
     limit: int = 10,
@@ -626,7 +640,7 @@ def semantic_search(
     return _ok(index.search(query, limit=limit, cluster=cluster, language=language))
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_locate(citation: str, language: str | None = None) -> dict:
     """Find a legislation citation's point(s) and cluster in the semantic atlas."""
     index, error = _semantic_payload(_get_semantic_index())
@@ -635,7 +649,7 @@ def semantic_locate(citation: str, language: str | None = None) -> dict:
     return _ok(index.locate(citation, language=language))
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_neighbors(
     point_id: int | None = None,
     citation: str | None = None,
@@ -660,7 +674,7 @@ def semantic_neighbors(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_clusters(query: str | None = None, limit: int = 50) -> dict:
     """List semantic-atlas topics, optionally filtered by label or Cap. title."""
     index, error = _semantic_payload(_get_semantic_index())
@@ -669,13 +683,75 @@ def semantic_clusters(query: str | None = None, limit: int = 50) -> dict:
     return _ok(index.clusters_list(query=query, limit=limit))
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_LOCAL)
 def semantic_cluster(cluster_id: int, limit: int = 20) -> dict:
     """Show one semantic topic and representative member provisions."""
     index, error = _semantic_payload(_get_semantic_index())
     if index is None:
         return _ok(error)
     return _ok(index.cluster(cluster_id, limit=limit))
+
+
+# The same functions back the stdio MCP server, the remote HTTP MCP endpoint,
+# the JSON API and the mobile web app. Keep this table in step with the
+# @mcp.tool() definitions above; tests/test_http_server.py enforces that it
+# matches the tools registered on ``mcp``.
+TOOL_FUNCTIONS = {
+    "search_legislation": search_legislation,
+    "get_section": get_section,
+    "get_section_range": get_section_range,
+    "statute_history": statute_history,
+    "list_section_versions": list_section_versions,
+    "list_ordinances": list_ordinances,
+    "search_cases": search_cases,
+    "get_case": get_case,
+    "get_case_paragraphs": get_case_paragraphs,
+    "note_up": note_up,
+    "verify_citation": verify_citation,
+    "verify_citations": verify_citations,
+    "doctrine_research": doctrine_research,
+    "sentencing_research": sentencing_research,
+    "authority_ranking": authority_ranking,
+    "case_graph": case_graph,
+    "corpus_status": corpus_status,
+    "sync_status": sync_status,
+    "search_doj": search_doj,
+    "get_doj_document": get_doj_document,
+    "list_doj_documents": list_doj_documents,
+    "verify_doj": verify_doj,
+    "doj_status": doj_status,
+    "sync_doj": sync_doj,
+    "semantic_status": semantic_status,
+    "semantic_search": semantic_search,
+    "semantic_locate": semantic_locate,
+    "semantic_neighbors": semantic_neighbors,
+    "semantic_clusters": semantic_clusters,
+    "semantic_cluster": semantic_cluster,
+}
+
+LIVE_TOOLS = {
+    "search_cases",
+    "get_case",
+    "get_case_paragraphs",
+    "note_up",
+    "verify_citation",
+    "verify_citations",
+    "doctrine_research",
+    "sentencing_research",
+    "authority_ranking",
+    "case_graph",
+}
+
+TOOL_ANNOTATIONS = {
+    name: (
+        WRITE_LIVE
+        if name == "sync_doj"
+        else READ_LIVE
+        if name in LIVE_TOOLS
+        else READ_LOCAL
+    )
+    for name in TOOL_FUNCTIONS
+}
 
 
 def main() -> None:

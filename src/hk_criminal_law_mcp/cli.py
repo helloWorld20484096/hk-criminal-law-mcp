@@ -337,6 +337,53 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     sub.add_parser("serve", help="Run the MCP server on stdio")
+
+    serve_http = sub.add_parser(
+        "serve-http",
+        help="Run the remote HTTP server (MCP, JSON API, OpenAPI, mobile web app)",
+    )
+    serve_http.add_argument("--host", default=None, help="bind address (default 127.0.0.1)")
+    serve_http.add_argument("--port", type=int, default=None, help="port (default 8765)")
+    serve_http.add_argument(
+        "--access-key",
+        default=None,
+        help="shared secret for clients (or HK_LAW_HTTP_ACCESS_KEY)",
+    )
+    serve_http.add_argument(
+        "--public-url",
+        default=None,
+        help="public https:// base URL; enables OAuth for hosted assistants",
+    )
+    serve_http.add_argument(
+        "--anonymous",
+        action="store_true",
+        help="allow unauthenticated access on a non-loopback bind",
+    )
+    serve_http.add_argument(
+        "--allowed-host", action="append", default=None, help="allowed Host header"
+    )
+    serve_http.add_argument(
+        "--allowed-origin", action="append", default=None, help="allowed Origin"
+    )
+    serve_http.add_argument("--rate-limit", type=int, default=None)
+    serve_http.add_argument("--rate-window", type=int, default=None)
+    serve_http.add_argument("--trust-proxy", action="store_true")
+    serve_http.add_argument(
+        "--stateful",
+        action="store_true",
+        help="keep MCP sessions instead of stateless HTTP",
+    )
+    serve_http.add_argument(
+        "--json-response",
+        action="store_true",
+        help="return application/json instead of SSE for MCP responses",
+    )
+    serve_http.add_argument(
+        "--allow-sync",
+        action="store_true",
+        help="expose sync_doj on the remote server (hidden by default)",
+    )
+    serve_http.add_argument("--log-level", default="info")
     return parser
 
 
@@ -345,6 +392,39 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.db:
         os.environ["HK_LAW_DB"] = str(Path(args.db).expanduser())
+
+    if args.command == "serve-http":
+        from .http_server import main as serve_http_main
+
+        forwarded: list[str] = ["--log-level", args.log_level]
+        if args.host:
+            forwarded += ["--host", args.host]
+        if args.port is not None:
+            forwarded += ["--port", str(args.port)]
+        if args.access_key:
+            forwarded += ["--access-key", args.access_key]
+        if args.public_url:
+            forwarded += ["--public-url", args.public_url]
+        if args.anonymous:
+            forwarded.append("--anonymous")
+        for host in args.allowed_host or []:
+            forwarded += ["--allowed-host", host]
+        for origin in args.allowed_origin or []:
+            forwarded += ["--allowed-origin", origin]
+        if args.rate_limit is not None:
+            forwarded += ["--rate-limit", str(args.rate_limit)]
+        if args.rate_window is not None:
+            forwarded += ["--rate-window", str(args.rate_window)]
+        if args.trust_proxy:
+            forwarded.append("--trust-proxy")
+        if args.stateful:
+            forwarded.append("--stateful")
+        if args.json_response:
+            forwarded.append("--json-response")
+        if args.allow_sync:
+            forwarded.append("--allow-sync")
+        serve_http_main(forwarded)
+        return
 
     if args.command == "init-db":
         conn = connect()

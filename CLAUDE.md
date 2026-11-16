@@ -20,6 +20,7 @@ make setup                 # python3 -m venv .venv && pip install -e '.[dev]'
 make test                  # .venv/bin/pytest -q
 .venv/bin/pytest tests/test_search.py::test_get_section -q   # single test
 make serve                 # run the MCP server on stdio
+make serve-http            # remote MCP + REST/OpenAPI + mobile web app on :8765
 make skills                # link skills/*/ into .claude/skills/
 ```
 
@@ -55,6 +56,23 @@ make map-smoke      # Playwright smoke test against semantic_map/dist
 
 CLI examples: `hk-law get-section 221 9J`, `search-legislation`, `statute-history 221 9J --as-of 2020-01-01`, `search-cases`, `get-case "[2021] HKCFA 1" --paragraphs 1 3`, `verify`, `verify-text`, `doctrine`, `sentencing`, `authority`, `case-graph`, `stats`.
 
+Remote HTTP surface (same tools, for ChatGPT/Claude/Gemini/DeepSeek/phones):
+
+```bash
+.venv/bin/hk-law serve-http                       # http://127.0.0.1:8765/ (anonymous, loopback)
+.venv/bin/hk-law serve-http --access-key "$KEY"   # key required
+# Public deployment (OAuth enabled when both are set):
+.venv/bin/hk-law serve-http --host 0.0.0.0 --access-key "$KEY" --public-url https://your-host
+docker compose up -d --build                      # app on 127.0.0.1:8765, Caddy in front
+```
+
+Endpoints: `/connect` (one-click setup), `/` (mobile app), `/mcp` (Streamable
+HTTP), `/api/<tool>` and `/api/call` (JSON), `/openapi.json` +
+`/openapi-core.json`, `/api/tools?format=openai|gemini|anthropic|deepseek`,
+`/server.json` + `/.well-known/mcp/server.json`, `/connect/dsh.sh`,
+`/privacy`, `/terms`, `/healthz`, `/.well-known/oauth-*` and `/oauth/consent`
+in OAuth mode. Per-client setup and security notes: `docs/remote-access.md`.
+
 Installation/multi-project use:
 
 ```bash
@@ -85,6 +103,9 @@ data/hk_law.db  (SQLite, WAL)
         ├── sync.py       legislation sync, DOJ sync, authorised case import, permission-gated citation sync
         ├── research.py   doctrine/sentencing/authority/case-graph packs
         ├── server.py     MCP tool wrappers (thin: open conn, call module, close)
+        ├── http_server.py remote ASGI app: /mcp, /api, /openapi.json, / and middleware
+        ├── oauth_server.py single-operator OAuth 2.1 provider for hosted assistants
+        ├── web/          packaged mobile web app (index.html)
         └── cli.py        hk-law argparse front end
 ```
 
@@ -99,7 +120,10 @@ data/hk_law.db  (SQLite, WAL)
 - `sync.py` — `sync_legislation` (DATA.GOV.HK incremental), `import_cases` (JSONL/CSV/JSON/SQLite/HTML), permission-gated `sync_cases`, DOJ `sync_doj` orchestration, and `sync_status`. Records `sync_runs`, `case_sources`, and `doj_sources`. It must refuse automated case access without `HK_LAW_CASE_PERMISSION_REF`.
 - `research.py` — composes the above into discovery packs; court levels are ranked by neutral-citation code, not by citator treatment.
 - `semantic_map/` — optional static semantic atlas: SQLite → deduplicated text → multilingual embeddings → PCA/UMAP → clustering (KMeans/HDBSCAN) → bilingual labels → static HTML/WebGL site. `semantic_map/data/` and `semantic_map/dist/` are generated and git-ignored; source is in `semantic_map/pipeline/` and `semantic_map/web/`.
-- `server.py` — FastMCP/MCPServer tool definitions; each tool opens and closes its own connection and attaches `DISCLAIMER`. It imports both MCP SDK paths (`mcp.server.fastmcp.FastMCP` for 1.x, `mcp.server.mcpserver.MCPServer` for 2.x) — keep both working. `cli.py` mirrors every tool.
+- `server.py` — FastMCP/MCPServer tool definitions; each tool opens and closes its own connection and attaches `DISCLAIMER`. It imports both MCP SDK paths (`mcp.server.fastmcp.FastMCP` for 1.x, `mcp.server.mcpserver.MCPServer` for 2.x) — keep both working. `cli.py` mirrors every tool. `INSTRUCTIONS` and the `TOOL_FUNCTIONS` table are shared with the HTTP surface; `tests/test_http_server.py` asserts that table matches the registered tools.
+- `http_server.py` — builds a second `MCPServer` for the remote app (so auth is per-process), registers the remote subset of `TOOL_FUNCTIONS`, and serves `/mcp` plus REST (`/api/<tool>`, `/api/call`), OpenAPI, health/meta and the web app. `HTTPSettings.from_env()` / `create_app()`; `sync_doj` is excluded unless `HK_LAW_HTTP_ALLOW_SYNC=1`. A non-loopback bind without `HK_LAW_HTTP_ACCESS_KEY` is refused unless `HK_LAW_HTTP_ALLOW_ANONYMOUS=1`. Rate limiter, bearer auth, CSP/security headers, optional CORS. The REST layer only runs names present in the remote registry and binds args with `inspect.signature`.
+- `oauth_server.py` — single-operator OAuth 2.1 provider used when `HK_LAW_HTTP_PUBLIC_URL` is set and either an access key or `HK_LAW_HTTP_ALLOW_ANONYMOUS=1` is present: dynamic client registration, PKCE, hashed access/refresh tokens in `$HK_LAW_HOME/oauth_state.json`, refresh rotation. With a key, a consent page gates approval; in **open mode** (public URL + anonymous, no key) authorization is auto-approved and the non-secret `open-access` bearer value is accepted for header-only MCP clients. The key also works as a plain bearer token. One process only.
+- Remote env vars: `HK_LAW_HTTP_HOST` / `PORT`, `HK_LAW_HTTP_ACCESS_KEY`, `HK_LAW_HTTP_PUBLIC_URL`, `HK_LAW_HTTP_ALLOW_ANONYMOUS`, `HK_LAW_HTTP_ALLOWED_HOSTS` / `ALLOWED_ORIGINS`, `HK_LAW_HTTP_RATE_LIMIT` / `RATE_WINDOW`, `HK_LAW_HTTP_TRUST_PROXY`, `HK_LAW_HTTP_STATELESS`, `HK_LAW_HTTP_JSON_RESPONSE`, `HK_LAW_HTTP_ALLOW_SYNC`.
 - `citations.py` — normalises `Cap. 221 s.9J` / `Cap. 221 Sch. 3` and `[2021] HKCFA 1`; extracts and deduplicates citations from free text.
 
 ## Invariants to preserve
@@ -113,6 +137,8 @@ data/hk_law.db  (SQLite, WAL)
 - Agent-facing MCP tools: `semantic_status`, `semantic_search`, `semantic_locate`, `semantic_neighbors`, `semantic_clusters`, `semantic_cluster`. The research subagent is `.claude/agents/hk-law-researcher.md`; external-agent setup is in `docs/agentic-use.md`.
 - The atlas is a static site, not a single HTML file: `semantic_map/dist/index.html` plus `data/` chunks. Serve it over HTTP; `file://` blocks `fetch()`. The CSP allows `'unsafe-eval'` because `regl` compiles shaders at runtime; all scripts are vendored locally.
 - Every result should carry provenance (`source_url`, `version_date`, language, fetch/ingest date) and the disclaimer. Search snippets are explicitly not the provision.
+- **Remote access must fail closed.** `serve-http` refuses a non-loopback bind or a public URL without `HK_LAW_HTTP_ACCESS_KEY` unless `HK_LAW_HTTP_ALLOW_ANONYMOUS=1`; the remote surface hides `sync_doj` unless `HK_LAW_HTTP_ALLOW_SYNC=1`; REST never dispatches to a name outside the remote registry. OAuth tokens are hashed at rest; key mode keeps the consent page's access-key check and `Cache-Control: no-store`. Open mode is only for deliberately public, read-only data and auto-approves OAuth.
+- **The remote HTTP surface is an operator deployment, not a judgment redistribution service.** Keep the disclaimer on every response, keep the rate limiter, and document that public deployments should normally use `HK_LAW_LOCAL_ONLY=1` unless the operator has permission for live HKLII at that scale.
 - Version number lives in three places: `pyproject.toml`, `src/hk_criminal_law_mcp/config.py` (`VERSION`), and `.claude-plugin/plugin.json`. Bump all three together.
 
 ## Skills

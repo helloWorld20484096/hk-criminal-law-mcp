@@ -48,3 +48,12 @@ record.
 
 See `docs/agentic-use.md` for Claude Code, subagent, and external-framework
 integration.
+
+## Remote surface
+
+`hk-law serve-http` exposes the same tools over Streamable HTTP at `/mcp`, a
+JSON API at `/api/<tool>`, OpenAPI at `/openapi.json`, a mobile web app at
+`/`, and a one-click setup page at `/connect`. Remote deployments require an
+operator access key (or an explicit anonymous/open mode), may hide `sync_doj`,
+and redact operator paths/permission references from status results. See
+`docs/remote-access.md`.

@@ -1,0 +1,19 @@
+# Caddy terminates HTTPS and forwards to the local container.
+# Replace the hostname, then: caddy reload --config deploy/Caddyfile
+#
+# Caddy obtains and renews the certificate automatically. The app must be
+# started with HK_LAW_HTTP_PUBLIC_URL=https://hk-law.example.com so OAuth
+# discovery advertises the right issuer.
+hk-law.example.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Streamable HTTP MCP uses long-lived SSE responses; disable buffering.
+	reverse_proxy 127.0.0.1:8765 {
+		flush_interval -1
+	}
+}
