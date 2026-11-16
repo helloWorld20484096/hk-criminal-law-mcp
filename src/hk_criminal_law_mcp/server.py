@@ -22,6 +22,7 @@ from .research import (
     doctrine_research as _doctrine_research,
     sentencing_research as _sentencing_research,
 )
+from .sync import sync_status as _sync_status
 from .search import (
     get_section as _get_section,
     get_section_range as _get_section_range,
@@ -36,9 +37,15 @@ from .search import (
 mcp = _MCPServer(
     "hk-criminal-law",
     instructions=(
-        "Hong Kong criminal law and defence research. Every provision or judgment "
-        "returned must be checked against the official source before use. This "
-        "server is a retrieval aid, not a citator of record and not legal advice."
+        "Hong Kong criminal law and defence research. This server is local-first: "
+        "search_cases and get_case read the local corpus by default; live HKLII "
+        "or LRS retrieval is available only when a permitted source is configured "
+        "and the caller explicitly opts in. Agent protocol: call corpus_status or "
+        "sync_status first; use search_legislation and search_cases for discovery, "
+        "then get_section, statute_history, search_cases, and get_case_paragraphs "
+        "for primary text; run verify_citations over every citation before relying "
+        "on it; label anything unverified [UNVERIFIED]. This server is a retrieval "
+        "aid, not a citator of record and not legal advice."
     ),
 )
 
@@ -172,13 +179,13 @@ def search_cases(
     year_to: int | None = None,
     limit: int = 10,
     lang: str = "en",
-    live: bool = True,
+    live: bool = False,
 ) -> dict:
-    """Search Hong Kong judgments.
+    """Search locally indexed Hong Kong judgments.
 
-    Searches the local judgment cache first, then (unless live=False) HKLII's
-    public search endpoint. `court` accepts a neutral-citation code such as
-    HKCFA/HKCA/HKCFI/HKDC or a court name.
+    Live HKLII search is opt-in (``live=True``) and should be used only when a
+    permitted source is configured. `court` accepts a neutral-citation code
+    such as HKCFA/HKCA/HKCFI/HKDC or a court name.
     """
     conn = _db()
     try:
@@ -197,20 +204,26 @@ def get_case(
     lang: str = "en",
     paragraphs: list[str] | None = None,
     max_chars: int = 20000,
+    allow_live: bool = False,
 ) -> dict:
-    """Fetch a Hong Kong judgment by neutral citation and cache it locally.
+    """Read a Hong Kong judgment from the local corpus.
 
     Args:
         citation: e.g. "[2021] HKCFA 1".
         lang: "en" or "zh-Hant".
         paragraphs: Optional paragraph numbers/ranges, e.g. ["12", "15-17"].
         max_chars: Truncate the returned full text to this many characters.
+        allow_live: Opt in to a permitted live fetch when the case is not local.
     """
     conn = _db()
     try:
         if paragraphs:
-            return _ok(_get_case_paragraphs(conn, citation, paragraphs, lang))
-        result = get_judgment(conn, citation, lang=lang)
+            return _ok(
+                _get_case_paragraphs(
+                    conn, citation, paragraphs, lang, allow_live=allow_live
+                )
+            )
+        result = get_judgment(conn, citation, lang=lang, allow_live=allow_live)
         text = result.get("text") or ""
         if len(text) > max_chars:
             result["text"] = text[:max_chars]
@@ -224,29 +237,47 @@ def get_case(
 
 
 @mcp.tool()
-def get_case_paragraphs(citation: str, paragraphs: list[str], lang: str = "en") -> dict:
-    """Return specific paragraphs of a judgment, fetching it if not cached."""
+def get_case_paragraphs(
+    citation: str,
+    paragraphs: list[str],
+    lang: str = "en",
+    allow_live: bool = False,
+) -> dict:
+    """Return specific paragraphs from the local corpus.
+
+    Set ``allow_live=True`` only when a permitted live source is configured.
+    """
     conn = _db()
     try:
-        return _ok(_get_case_paragraphs(conn, citation, paragraphs, lang))
+        return _ok(
+            _get_case_paragraphs(
+                conn, citation, paragraphs, lang, allow_live=allow_live
+            )
+        )
     finally:
         conn.close()
 
 
 @mcp.tool()
-def note_up(citation: str, force: bool = False) -> dict:
-    """Return HKLII note-up data for a judgment (research aid, not a citator)."""
+def note_up(citation: str, force: bool = False, allow_live: bool = False) -> dict:
+    """Return cached note-up data (research aid, not a citator).
+
+    ``allow_live=True`` opts in to a permitted live note-up request.
+    """
     conn = _db()
     try:
-        return _ok(_note_up(conn, citation, force=force))
+        return _ok(
+            _note_up(conn, citation, force=force, allow_live=allow_live)
+        )
     finally:
         conn.close()
 
 
 @mcp.tool()
-def verify_citation(citation: str, lang: str = "en", live: bool = True) -> dict:
-    """Verify a legislation or case citation against the local corpus/HKLII.
+def verify_citation(citation: str, lang: str = "en", live: bool = False) -> dict:
+    """Verify a citation against the local corpus.
 
+    Set ``live=True`` only when a permitted live source is configured.
     Examples: "Cap. 221 s.9J", "section 9J of Cap. 221", "[2021] HKCFA 1".
     """
     conn = _db()
@@ -341,9 +372,9 @@ def authority_ranking(
 def case_graph(
     citation: str,
     lang: str = "en",
-    live_note_up: bool = True,
+    live_note_up: bool = False,
 ) -> dict:
-    """Return outgoing cited cases and incoming note-up citations for a case."""
+    """Return outgoing cited cases and cached incoming note-up citations."""
     conn = _db()
     try:
         return _ok(_case_graph(conn, citation, lang, live_note_up))
@@ -353,10 +384,20 @@ def case_graph(
 
 @mcp.tool()
 def corpus_status() -> dict:
-    """Report database size, coverage, and last ingest/fetch times."""
+    """Report database size, coverage, sync freshness, and local-only mode."""
     conn = _db()
     try:
-        return _ok({"status": "ok", "corpus": stats(conn)})
+        return _ok({"status": "ok", "corpus": _sync_status(conn)})
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def sync_status() -> dict:
+    """Report local coverage, last sync runs, and permission configuration."""
+    conn = _db()
+    try:
+        return _ok(_sync_status(conn))
     finally:
         conn.close()
 

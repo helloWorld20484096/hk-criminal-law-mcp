@@ -13,7 +13,7 @@ from .citations import (
     parse_case_citation,
     parse_legislation_citation,
 )
-from .hklii import HKLIIError, get_judgment
+from .hklii import CaseNotLocalError, HKLIIError, get_judgment
 
 _WORD_RE = re.compile(r"[A-Za-z0-9']+")
 
@@ -543,9 +543,9 @@ def verify_citation(
     conn: sqlite3.Connection,
     citation: str,
     lang: str = "en",
-    live: bool = True,
+    live: bool = False,
 ) -> dict:
-    """Verify a legislation or case citation against the corpus/HKLII."""
+    """Verify a legislation or case citation against the local corpus."""
     leg = parse_legislation_citation(citation)
     if leg:
         if leg.section or leg.schedule:
@@ -616,7 +616,7 @@ def verify_citation(
                 },
                 "source": "hklii_live",
             }
-        except HKLIIError as exc:
+        except (HKLIIError, CaseNotLocalError) as exc:
             return {
                 "input": citation,
                 "type": "case",

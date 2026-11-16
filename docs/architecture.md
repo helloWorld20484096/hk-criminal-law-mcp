@@ -19,7 +19,9 @@ All modules live under `src/hk_criminal_law_mcp/`.
 - **`ingest_legislation.py`** — Downloader and current/historical indexers.
 - **`citations.py`** — Cap./section and neutral-citation parsing/extraction.
 - **`search.py`** — Legislation search, ranges, history, verification.
-- **`hklii.py`** — Judgment/search/note-up client and cache.
+- **`hklii.py`** — Judgment/search/note-up client and cache; local-only guard.
+- **`sync.py`** — Incremental legislation sync, authorised judgment import,
+  permission-gated citation sync, and sync status.
 - **`research.py`** — Doctrine/sentencing/authority/citation-graph packs.
 - **`server.py`** — MCP tools (FastMCP/MCPServer, stdio).
 - **`cli.py`** — `hk-law` command line.
@@ -59,18 +61,42 @@ The parser:
 
 ### Judgments
 
-1. `search_cases` queries the local FTS index first.
-2. Unless `live=False`, it also calls HKLII's `api/simplesearch`.
-3. `get_case` calls `api/getjudgment`, parses numbered paragraphs from
-   `<a class="para">` anchors, and caches the judgment, paragraphs, cited-case
-   list, and raw HTML in SQLite.
-4. `note_up` calls `api/getcasenoteup` and caches the payload.
-5. HKLII requests are serialized by a process-wide rate limiter (default
-   1.5 s between requests) with retries and backoff.
+The MCP is local-first. `search_cases`, `get_case`, `get_case_paragraphs`, and
+`verify_citation` read SQLite by default. Live HKLII access requires an explicit
+`live=True` / `allow_live=True` and is disabled entirely when
+`HK_LAW_LOCAL_ONLY=1` (the launcher default).
+
+Judgments enter the local corpus in one of two ways:
+
+1. **Authorised import** — `hk-law import-cases` reads JSONL/CSV/JSON, a SQLite
+   `cases` table, or an HTML directory with sidecars. It parses or accepts
+   numbered paragraphs and calls `hklii.store_case` in a batch transaction.
+2. **Permission-gated citation sync** — `hk-law sync --citations ...` requires
+   `HK_LAW_CASE_PERMISSION_REF` and an explicit citation list. It calls
+   `api/getjudgment` for each listed citation only. There is no discovery
+   crawler; LRS `robots.txt` is `Disallow: /` and HKLII's is `Disallow: /api`.
+
+When live retrieval is permitted, `get_judgment` parses numbered paragraphs
+from `<a class="para">` anchors and caches the judgment, paragraphs,
+cited-case list, and raw HTML in SQLite. `note_up` caches the payload.
+HKLII requests are serialized by a process-wide rate limiter (default 1.5 s
+between requests) with retries and backoff.
 
 Search-result caching uses `case_search_cache` with a default 6-hour TTL
-(`HK_LAW_CACHE_TTL`). Judgment text is cached indefinitely until refreshed with
-`force=True`.
+(`HK_LAW_CACHE_TTL`). Local judgment text is retained until re-imported or
+explicitly refreshed.
+
+### Local sync
+
+1. `hk-law sync --dataset current` issues a HEAD/conditional GET for each
+   DATA.GOV.HK archive. Unchanged archives are skipped.
+2. Changed ZIPs are downloaded to `.part` and atomically replaced.
+3. The XML indexer compares each document's SHA-256 with the stored checksum
+   and skips unchanged documents (`skip_unchanged=True`).
+4. Changed documents are upserted with their sections and FTS rows.
+5. The run is recorded in `sync_runs`; archive validators are stored in `meta`.
+6. `hk-law import-cases` or the permission-gated citation sync updates the
+   local judgment corpus and `case_sources`.
 
 ## SQLite schema
 
@@ -87,7 +113,9 @@ Search-result caching uses `case_search_cache` with a default 6-hour TTL
 | `cases_fts_en` / `cases_fts_zh` | judgment full-text indexes |
 | `case_noteups` | note-up payload cache |
 | `case_search_cache` | search-response cache |
-| `meta` | reserved for future schema/version metadata |
+| `sync_runs` | one row per legislation/case sync or import, with JSON stats and error |
+| `case_sources` | provenance for imported/authorised judgment sources |
+| `meta` | schema/sync metadata, archive ETag/Last-Modified |
 
 FTS5 auxiliary functions (`snippet`, `bm25`) require the real table name, not
 a table alias. This is why the queries spell out `legislation_fts_en` etc.
@@ -114,6 +142,11 @@ a table alias. This is why the queries spell out `legislation_fts_en` etc.
   and re-inserts that document's sections and FTS rows.
 - The downloaded archives and database are git-ignored and are not part of the
   source distribution.
+- `scripts/run_mcp.sh` exports `HK_LAW_LOCAL_ONLY=1`; the MCP then never
+  contacts HKLII or the LRS. `scripts/sync.sh` performs the explicit update.
+- `scripts/install_sync_timer.sh` installs `hk-law-sync.service` and
+  `hk-law-sync.timer` under `~/.config/systemd/user/`. Permission-gated case
+  variables live in `~/.config/hk-law-sync.env` (mode 0600), not in the unit.
 
 ## Related
 

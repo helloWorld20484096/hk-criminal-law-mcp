@@ -22,6 +22,12 @@ from .research import (
     doctrine_research,
     sentencing_research,
 )
+from .sync import (
+    import_cases,
+    run_sync,
+    sync_cases,
+    sync_status,
+)
 from .search import (
     get_section,
     get_section_range,
@@ -69,6 +75,54 @@ def build_parser() -> argparse.ArgumentParser:
         help="Dataset-specific ranges; omit to use defaults for the dataset",
     )
     download.add_argument("--force", action="store_true")
+
+    sync_p = sub.add_parser(
+        "sync", help="Update legislation and import/sync authorised judgments"
+    )
+    sync_p.add_argument("--data-dir", default="data/raw")
+    sync_p.add_argument("--languages", nargs="+", default=["en", "zh-Hant"])
+    sync_p.add_argument(
+        "--dataset", choices=["current", "past", "both"], default="current"
+    )
+    sync_p.add_argument("--force", action="store_true")
+    sync_p.add_argument(
+        "--no-legislation", action="store_true", help="Skip the DATA.GOV.HK update"
+    )
+    sync_p.add_argument(
+        "--no-cases", action="store_true", help="Skip case imports/sync"
+    )
+    sync_p.add_argument(
+        "--cases-dir",
+        default=None,
+        help="Authorised judgment drop folder (or set HK_LAW_CASE_IMPORT_DIR)",
+    )
+    sync_p.add_argument(
+        "--case-format",
+        choices=["auto", "jsonl", "csv", "json", "sqlite", "html"],
+        default="auto",
+    )
+    sync_p.add_argument(
+        "--citations",
+        default=None,
+        help="Authorised citation list for the permission-gated HKLII adapter",
+    )
+    sync_p.add_argument("--source", default=None)
+    sync_p.add_argument("--license", default=None)
+
+    import_p = sub.add_parser(
+        "import-cases", help="Import an authorised judgment corpus into SQLite"
+    )
+    import_p.add_argument("--path", required=True)
+    import_p.add_argument(
+        "--format",
+        choices=["auto", "jsonl", "csv", "json", "sqlite", "html"],
+        default="auto",
+    )
+    import_p.add_argument("--source", default=None)
+    import_p.add_argument("--license", default=None)
+    import_p.add_argument("--permission-ref", default=None)
+
+    sub.add_parser("sync-status", help="Show local coverage and sync freshness")
 
     ingest = sub.add_parser("ingest", help="Index e-Legislation ZIPs into SQLite")
     ingest.add_argument("--data-dir", default="data/raw")
@@ -126,18 +180,27 @@ def build_parser() -> argparse.ArgumentParser:
     search_cases_p.add_argument("--year-to", type=int)
     search_cases_p.add_argument("--limit", type=int, default=10)
     search_cases_p.add_argument("--lang", default="en")
-    search_cases_p.add_argument("--no-live", action="store_true")
+    search_cases_p.add_argument(
+        "--live", action="store_true", help="Also query HKLII (permission required)"
+    )
+    search_cases_p.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
-    get_case_p = sub.add_parser("get-case", help="Fetch/cache a judgment")
+    get_case_p = sub.add_parser("get-case", help="Read or fetch a judgment")
     get_case_p.add_argument("citation")
     get_case_p.add_argument("--lang", default="en")
     get_case_p.add_argument("--paragraphs", nargs="*")
     get_case_p.add_argument("--max-chars", type=int, default=20000)
+    get_case_p.add_argument(
+        "--local-only", action="store_true", help="Never contact HKLII"
+    )
 
     verify = sub.add_parser("verify", help="Verify a citation")
     verify.add_argument("citation")
     verify.add_argument("--lang", default="en")
-    verify.add_argument("--no-live", action="store_true")
+    verify.add_argument(
+        "--live", action="store_true", help="Allow a live HKLII check if permitted"
+    )
+    verify.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     verify_text = sub.add_parser(
         "verify-text", help="Extract and verify all citations in a passage"
@@ -146,9 +209,12 @@ def build_parser() -> argparse.ArgumentParser:
     verify_text.add_argument("--lang", default="en")
     verify_text.add_argument("--live", action="store_true")
 
-    note = sub.add_parser("note-up", help="Fetch HKLII note-up data")
+    note = sub.add_parser("note-up", help="Read cached or permitted note-up data")
     note.add_argument("citation")
     note.add_argument("--force", action="store_true")
+    note.add_argument(
+        "--local-only", action="store_true", help="Use only cached note-up data"
+    )
 
     doctrine = sub.add_parser(
         "doctrine", help="Legislation + ranked case leads for an issue"
@@ -182,7 +248,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     graph.add_argument("citation")
     graph.add_argument("--lang", default="en")
-    graph.add_argument("--no-live", action="store_true")
+    graph.add_argument(
+        "--live", action="store_true", help="Include live note-up if permitted"
+    )
+    graph.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     sub.add_parser("serve", help="Run the MCP server on stdio")
     return parser
@@ -216,6 +285,54 @@ def main(argv: list[str] | None = None) -> None:
             dataset=args.dataset,
         )
         _dump({"downloaded": [str(p) for p in paths]})
+        return
+
+    if args.command == "sync":
+        conn = connect()
+        try:
+            result = run_sync(
+                conn,
+                data_dir=args.data_dir,
+                languages=args.languages,
+                dataset=args.dataset,
+                force=args.force,
+                include_legislation=not args.no_legislation,
+                include_cases=not args.no_cases,
+                cases_dir=args.cases_dir,
+                case_format=args.case_format,
+                citations=args.citations,
+                source=args.source,
+                license=args.license,
+                progress=_progress,
+            )
+            _dump({"status": "ok", **result, "corpus": sync_status(conn)})
+        finally:
+            conn.close()
+        return
+
+    if args.command == "import-cases":
+        conn = connect()
+        try:
+            result = import_cases(
+                conn,
+                args.path,
+                format=args.format,
+                source=args.source,
+                license=args.license,
+                permission_ref=args.permission_ref,
+                progress=_progress,
+            )
+            _dump({"status": "ok", **result, "corpus": sync_status(conn)})
+        finally:
+            conn.close()
+        return
+
+    if args.command == "sync-status":
+        conn = connect()
+        try:
+            _dump({"status": "ok", "sync": sync_status(conn)})
+        finally:
+            conn.close()
         return
 
     if args.command == "ingest":
@@ -298,14 +415,25 @@ def main(argv: list[str] | None = None) -> None:
                     year_to=args.year_to,
                     limit=args.limit,
                     lang=args.lang,
-                    live=not args.no_live,
+                    live=args.live and not args.no_live,
                 )
             )
         elif args.command == "get-case":
+            allow_live = not args.local_only
             if args.paragraphs:
-                _dump(get_case_paragraphs(conn, args.citation, args.paragraphs, args.lang))
+                _dump(
+                    get_case_paragraphs(
+                        conn,
+                        args.citation,
+                        args.paragraphs,
+                        args.lang,
+                        allow_live=allow_live,
+                    )
+                )
             else:
-                result = get_judgment(conn, args.citation, lang=args.lang)
+                result = get_judgment(
+                    conn, args.citation, lang=args.lang, allow_live=allow_live
+                )
                 text = result.get("text") or ""
                 if len(text) > args.max_chars:
                     result["text"] = text[: args.max_chars]
@@ -313,7 +441,14 @@ def main(argv: list[str] | None = None) -> None:
                     result["full_text_chars"] = len(text)
                 _dump(result)
         elif args.command == "verify":
-            _dump(verify_citation(conn, args.citation, lang=args.lang, live=not args.no_live))
+            _dump(
+                verify_citation(
+                    conn,
+                    args.citation,
+                    lang=args.lang,
+                    live=args.live and not args.no_live,
+                )
+            )
         elif args.command == "verify-text":
             _dump(
                 verify_citations(
@@ -359,11 +494,18 @@ def main(argv: list[str] | None = None) -> None:
                     conn,
                     args.citation,
                     lang=args.lang,
-                    live_note_up=not args.no_live,
+                    live_note_up=args.live and not args.no_live,
                 )
             )
         elif args.command == "note-up":
-            _dump(note_up(conn, args.citation, force=args.force))
+            _dump(
+                note_up(
+                    conn,
+                    args.citation,
+                    force=args.force,
+                    allow_live=not args.local_only,
+                )
+            )
         elif args.command == "serve":
             from .server import mcp
 

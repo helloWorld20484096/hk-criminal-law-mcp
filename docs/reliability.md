@@ -151,16 +151,18 @@ Use these in research outputs:
 
 1. Sample 10 random sections from the corpus; compare heading and text to the
    e-Legislation website.
-2. Sample 5 cached judgments; compare paragraph numbers to the source.
+2. Sample 5 imported judgments; compare paragraph numbers to the source.
 3. Run `verify_citation` on known-good and deliberately wrong citations.
-4. Check `corpus_status` for the version date and last ingest time.
+4. Check `corpus_status` / `sync_status` for version dates, last sync, and
+   judgment-source provenance.
 5. Re-run `pytest`.
 
 ## Known limitations
 
 - HKLII endpoints are unofficial and may change.
 - Note-up data and authority ranking are not a citator of record.
-- Case law coverage is demand-driven, not exhaustive.
+- Case law coverage depends on the authorised corpus you import; it is not
+  exhaustive, and there is no built-in LRS/HKLII crawler.
 - Chinese search uses trigram matching; very short queries fall back to LIKE.
 - Historical coverage depends on which Past Version archives/languages were
   ingested; commencement timelines are not reconstructed.

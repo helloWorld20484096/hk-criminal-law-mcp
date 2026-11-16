@@ -9,7 +9,7 @@ A local-first research stack for Hong Kong criminal law and defence. The Python 
 - an MCP server (`hk_criminal_law_mcp.server`, stdio) exposing citation-aware research tools to Claude Code or any MCP client;
 - a CLI (`hk-law`) with the same functionality.
 
-Legislation is indexed locally from official DATA.GOV.HK e-Legislation XML (HKL M 1.0). Judgments are fetched from HKLII on demand and cached locally. The project is a retrieval aid, not a citator of record and not legal advice; every provision and judgment must be checked against the official source.
+Legislation is indexed locally from official DATA.GOV.HK e-Legislation XML (HKL M 1.0). Judgments are imported from an authorised corpus, or fetched through a permission-gated citation list; the MCP is local-first and does not crawl the LRS or HKLII. The project is a retrieval aid, not a citator of record and not legal advice; every provision and judgment must be checked against the official source.
 
 ## Commands
 
@@ -61,20 +61,23 @@ data/hk_law.db  (SQLite, WAL)
   legislation_docs/sections + FTS (current)
   legislation_history_docs/sections (past versions, date-keyed)
   cases/case_paragraphs + FTS, case_noteups, case_search_cache
+  sync_runs (audit), case_sources (judgment provenance)
         ▲
         ├── search.py     legislation retrieval, ranges, history, verification
-        ├── hklii.py      judgment/search/note-up client + cache
+        ├── hklii.py      judgment/search/note-up client + local cache + local-only guard
+        ├── sync.py       legislation sync, authorised case import, permission-gated citation sync
         ├── research.py   doctrine/sentencing/authority/case-graph packs
         ├── server.py     MCP tool wrappers (thin: open conn, call module, close)
         └── cli.py        hk-law argparse front end
 ```
 
-- `config.py` — env configuration and the standard disclaimer. Key vars: `HK_LAW_DB`, `HK_LAW_DATA_DIR`, `HK_LAW_HOME`, `HK_LAW_REQUEST_INTERVAL`, and endpoint overrides `HK_LAW_HKLII_BASE` / `HK_LAW_ELEGISLATION_BASE` / `HK_LAW_DATA_GOV_BASE`.
+- `config.py` — env configuration and the standard disclaimer. Key vars: `HK_LAW_DB`, `HK_LAW_DATA_DIR`, `HK_LAW_HOME`, `HK_LAW_REQUEST_INTERVAL`, endpoint overrides `HK_LAW_HKLII_BASE` / `HK_LAW_ELEGISLATION_BASE` / `HK_LAW_DATA_GOV_BASE`, plus `HK_LAW_LOCAL_ONLY` (launcher default `1`) and the permission-gated case vars `HK_LAW_CASE_PERMISSION_REF` / `HK_LAW_CASE_CITATIONS` / `HK_LAW_CASE_IMPORT_DIR`.
 - `db.py` — owns the schema (`SCHEMA`), `connect()` (creates schema, enables WAL/foreign keys, normalises legacy version dates), and `stats()`.
 - `legislation_xml.py` — HKL M 1.0 parser. Skips repealed sections/schedules; separates amendment `sourceNote` from operative text; indexes schedules and nested `role="rule"` sections under High Court Orders (the Order becomes part context); deduplicates storage keys with `temporalId`/`~N` suffixes when numbering repeats.
-- `ingest_legislation.py` — download map for current (`hkel_c_*`) and past (`hkel_p_*`) archives; auto-detects history archives; upserts per document/language and re-inserts that document's sections and FTS rows (idempotent).
+- `ingest_legislation.py` — download map for current (`hkel_c_*`) and past (`hkel_p_*`) archives; auto-detects history archives; upserts per document/language and re-inserts that document's sections and FTS rows (idempotent). `skip_unchanged=True` compares each XML's checksum with the stored document checksum for incremental sync.
 - `search.py` — current-corpus FTS (`legislation_fts_en` porter, `legislation_fts_zh` trigram), section/range lookup, historical version listing, and citation verification.
-- `hklii.py` — local judgment cache first, then HKLII JSON endpoints (`api/simplesearch`, `api/getjudgment`, `api/getcasenoteup`). Search responses cached with `HK_LAW_CACHE_TTL` (default 6 h); judgments cached until `force=True`. A process-wide rate limiter enforces 1.5 s between requests with retries/backoff.
+- `hklii.py` — local judgment corpus first; HKLII JSON endpoints (`api/simplesearch`, `api/getjudgment`, `api/getcasenoteup`) only when `allow_live=True` and `HK_LAW_LOCAL_ONLY` is off. The permission-gated citation list lives in `sync.py`; there is no discovery crawler. Search responses cached with `HK_LAW_CACHE_TTL` (default 6 h); imported judgment text retained until re-imported. A process-wide rate limiter enforces 1.5 s between requests with retries/backoff.
+- `sync.py` — `sync_legislation` (DATA.GOV.HK incremental), `import_cases` (JSONL/CSV/JSON/SQLite/HTML), permission-gated `sync_cases`, and `sync_status`. Records `sync_runs` and `case_sources`. It must refuse automated case access without `HK_LAW_CASE_PERMISSION_REF`.
 - `research.py` — composes the above into discovery packs; court levels are ranked by neutral-citation code, not by citator treatment.
 - `server.py` — FastMCP/MCPServer tool definitions; each tool opens and closes its own connection and attaches `DISCLAIMER`. It imports both MCP SDK paths (`mcp.server.fastmcp.FastMCP` for 1.x, `mcp.server.mcpserver.MCPServer` for 2.x) — keep both working. `cli.py` mirrors every tool.
 - `citations.py` — normalises `Cap. 221 s.9J` / `Cap. 221 Sch. 3` and `[2021] HKCFA 1`; extracts and deduplicates citations from free text.
@@ -84,7 +87,7 @@ data/hk_law.db  (SQLite, WAL)
 - **Never invent a citation or historical text.** `verify_citation` returns `verified` / `not_found` / `unverified` / `mismatch` / `unrecognised`; `verify_citations` applies this to a whole passage. Keep those semantics.
 - **`statute_history` must not pass current law off as historical law.** If the requested date is on/after the current version date, or no past archive was ingested, it returns current text with `historical: false` and a warning. Preserve the `historical` flag, warnings, and `next_version_date`.
 - FTS5 auxiliary functions (`snippet`, `bm25`) require the literal table name, not an alias — queries spell out `legislation_fts_en`, `legislation_fts_zh`, `cases_fts_en`, `cases_fts_zh`. Chinese queries under 3 characters fall back to `LIKE`.
-- Judgments and downloaded archives are **not redistributed**. Do not add bundled judgment text, a prebuilt judgment database, or bulk-crawling. Keep HKLII rate limiting intact; its JSON endpoints are undocumented and may change.
+- Judgments and downloaded archives are **not redistributed**. Do not add bundled judgment text, a prebuilt judgment database, or a crawler. The supported paths are authorised import and the permission-gated citation list; automated HKLII/LRS access requires `HK_LAW_CASE_PERMISSION_REF`. Keep HKLII rate limiting intact; its JSON endpoints are undocumented and may change.
 - Downloaded data (`data/`) and `.db` files are git-ignored. The local corpus here is roughly 2.4 GB; never commit it.
 - Every result should carry provenance (`source_url`, `version_date`, language, fetch/ingest date) and the disclaimer. Search snippets are explicitly not the provision.
 - Version number lives in three places: `pyproject.toml`, `src/hk_criminal_law_mcp/config.py` (`VERSION`), and `.claude-plugin/plugin.json`. Bump all three together.

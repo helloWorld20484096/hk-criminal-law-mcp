@@ -59,11 +59,14 @@ were ingested. Commencement timelines are not reconstructed.
 
 **Terms:** the Judiciary permits downloading of judgments for private study and
 research. Commercial use requires a written application. There is no official
-public API, and hyperlinking to the database requires prior approval.
+public API, and hyperlinking to the database requires prior approval. Its
+`robots.txt` is `Disallow: /`.
 
-This project does not bundle judgments. It fetches a judgment only when the
-user requests a specific neutral citation, caches it locally, and stores the
-Judiciary's document URL when HKLII provides one.
+This project does not bundle judgments and does not crawl the LRS. It imports a
+corpus the operator is authorised to use, or fetches an explicit citation list
+through a permission-gated adapter. Automated bulk access requires written
+permission; see
+[Permission request template](permission-request-template.md).
 
 **Do not** use the local cache for commercial redistribution, bulk publication,
 or a competing database without checking the Judiciary's terms and obtaining
@@ -73,21 +76,29 @@ permission where required.
 
 **Source:** <https://www.hklii.hk/>
 
-**Terms:** HKLII is a free public legal information service. The project uses
-the same JSON endpoints as HKLII's web client:
+**Terms:** HKLII is a free public legal information service. Its `robots.txt`
+is `Disallow: /api`, and its terms prohibit automated harvesting/re-supply.
+The project therefore does **not** crawl HKLII. The JSON endpoints are used
+only for an explicit, permitted citation list after written permission:
 
 - `GET /api/simplesearch?searchstring=...`
 - `GET /api/getjudgment?lang=en&abbr=hkcfa&year=2021&num=1`
 - `GET /api/getcasenoteup?abbr=...&year=...&num=...`
 
 These endpoints are **undocumented** and may change or be withdrawn. They are
-not an official Judiciary API. The client:
+not an official Judiciary API. When a permitted citation list is configured,
+the client:
 
 - identifies itself with a project User-Agent;
 - serializes requests with a 1.5-second minimum interval;
 - retries with backoff on transient failures;
 - caches responses locally;
-- does not bulk-crawl or redistribute judgment text.
+- does not crawl, discover cases, or redistribute judgment text.
+
+The `sync_cases` function refuses to run without
+`HK_LAW_CASE_PERMISSION_REF` and an explicit citation list. The default MCP
+launcher sets `HK_LAW_LOCAL_ONLY=1`, so no live call happens unless the operator
+deliberately changes that.
 
 **Attribution:** cite the neutral citation and link to the HKLII or Judiciary
 source. Do not describe HKLII as an official government source.
@@ -97,6 +108,25 @@ source. Do not describe HKLII as an official government source.
 The Bill of Rights Ordinance (Cap. 383) and constitutional instruments are
 included in the e-Legislation archives and are subject to the same DATA.GOV.HK
 terms.
+
+## Authorised bulk access
+
+If you obtain written permission, record the reference and the permitted
+endpoint outside the repository:
+
+```bash
+# ~/.config/hk-law-sync.env (mode 0600)
+HK_LAW_CASE_PERMISSION_REF="JUD-HKLII-2026-001"
+HK_LAW_CASE_SOURCE="hklii"
+HK_LAW_CASE_SOURCE_URL="https://permitted.example/path"
+HK_LAW_CASE_CITATIONS="/absolute/path/to/authorised-citations.txt"
+HK_LAW_CASE_LICENSE="Private research; no redistribution"
+```
+
+`hk-law sync --citations ...` fetches only that explicit list. It does not
+discover cases. The LRS adapter is not wired until the permission letter
+specifies the permitted URL pattern, scope, and rate limit. The written request
+template is [here](permission-request-template.md).
 
 ## Project licenses
 
@@ -113,7 +143,10 @@ terms.
 - [ ] I did not redistribute the bulk archives or the SQLite database.
 - [ ] I checked the Judiciary/HKLII terms before commercial use.
 - [ ] I did not present the local copy as the official text.
-- [ ] I did not bulk-crawl HKLII or bypass its rate limits.
+- [ ] I did not crawl the LRS or HKLII without written permission.
+- [ ] Any automated case access uses an explicit citation list and a recorded
+      permission reference.
+- [ ] Imported judgment text stays local and is not redistributed.
 
 ## Related
 

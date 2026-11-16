@@ -55,3 +55,64 @@ def data_dir() -> Path:
     path = Path(raw).expanduser() if raw else home_dir() / "data"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def semantic_map_dir() -> Path:
+    """Return the generated semantic-atlas data directory.
+
+    ``HK_LAW_SEMANTIC_MAP`` wins. Otherwise use the repository copy when the
+    package is running from a checkout. The global installer sets the env var
+    explicitly for installed copies.
+    """
+    raw = os.environ.get("HK_LAW_SEMANTIC_MAP")
+    if raw:
+        return Path(raw).expanduser()
+    return Path(__file__).resolve().parents[2] / "semantic_map" / "dist" / "data"
+
+
+def local_only() -> bool:
+    """Return True when all live network retrieval must be disabled.
+
+    The MCP launcher sets this by default so the server is fully local. Set
+    ``HK_LAW_LOCAL_ONLY=0`` only when a permitted live source is configured.
+    """
+    return os.environ.get("HK_LAW_LOCAL_ONLY", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def case_permission_ref() -> str | None:
+    """Return the written-permission reference for automated case access.
+
+    This is deliberately not a URL. It records *why* the operator is allowed to
+    use the configured source (for example, a Judiciary/HKLII permission letter
+    reference). The sync code refuses to run without it.
+    """
+    value = os.environ.get("HK_LAW_CASE_PERMISSION_REF", "").strip()
+    return value or None
+
+
+def case_source_url() -> str | None:
+    """Return the permitted case-source endpoint, if one is configured."""
+    value = os.environ.get("HK_LAW_CASE_SOURCE_URL", "").strip()
+    return value or None
+
+
+def case_source_name() -> str:
+    """Return the operator-facing name of the configured case source."""
+    return os.environ.get("HK_LAW_CASE_SOURCE", "authorized-import").strip() or "authorized-import"
+
+
+def case_import_dir() -> Path | None:
+    """Return the optional drop folder scanned by ``hk-law sync``."""
+    raw = os.environ.get("HK_LAW_CASE_IMPORT_DIR", "").strip()
+    return Path(raw).expanduser() if raw else None
+
+
+def case_citations_file() -> Path | None:
+    """Return the optional, permission-gated citation list for ``sync``."""
+    raw = os.environ.get("HK_LAW_CASE_CITATIONS", "").strip()
+    return Path(raw).expanduser() if raw else None

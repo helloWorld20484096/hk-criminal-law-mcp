@@ -303,6 +303,7 @@ def ingest_history_zip(
     zip_path: Path,
     only_language: str | None = None,
     progress: Callable[[str], None] | None = None,
+    skip_unchanged: bool = False,
 ) -> dict[str, int]:
     """Index the historical versions in a HKeL past-version ZIP archive."""
     counts = {"documents": 0, "sections": 0, "skipped": 0, "failed": 0}
@@ -324,6 +325,15 @@ def ingest_history_zip(
                 counts["skipped"] += 1
                 continue
             checksum = hashlib.sha256(data).hexdigest()
+            if skip_unchanged:
+                existing = conn.execute(
+                    "SELECT checksum FROM legislation_history_docs "
+                    "WHERE cap=? AND doc_type=? AND language=? AND version_date=?",
+                    (doc.cap, doc.doc_type, doc.language, doc.version_date),
+                ).fetchone()
+                if existing and existing["checksum"] == checksum:
+                    counts["skipped"] += 1
+                    continue
             upsert_history_document(conn, doc, f"{zip_path.name}:{entry}", checksum)
             counts["documents"] += 1
             counts["sections"] += len(doc.sections)
@@ -343,6 +353,7 @@ def ingest_zip(
     zip_path: Path,
     only_language: str | None = None,
     progress: Callable[[str], None] | None = None,
+    skip_unchanged: bool = False,
 ) -> dict[str, int]:
     """Index every XML document in a HKeL ZIP archive."""
     counts = {"documents": 0, "sections": 0, "skipped": 0, "failed": 0}
@@ -364,6 +375,15 @@ def ingest_zip(
                 counts["skipped"] += 1
                 continue
             checksum = hashlib.sha256(data).hexdigest()
+            if skip_unchanged:
+                existing = conn.execute(
+                    "SELECT checksum FROM legislation_docs "
+                    "WHERE cap=? AND doc_type=? AND language=?",
+                    (doc.cap, doc.doc_type, doc.language),
+                ).fetchone()
+                if existing and existing["checksum"] == checksum:
+                    counts["skipped"] += 1
+                    continue
             upsert_document(conn, doc, f"{zip_path.name}:{entry}", checksum)
             counts["documents"] += 1
             counts["sections"] += len(doc.sections)
@@ -381,6 +401,7 @@ def ingest_archives(
     paths: Iterable[Path],
     only_language: str | None = None,
     progress: Callable[[str], None] | None = None,
+    skip_unchanged: bool = False,
 ) -> dict[str, int]:
     total = {"documents": 0, "sections": 0, "skipped": 0, "failed": 0}
     for path in paths:
@@ -388,7 +409,13 @@ def ingest_archives(
             kind = "historical versions" if is_history_archive(path) else "current versions"
             progress(f"indexing {path.name} ({kind})")
         ingest = ingest_history_zip if is_history_archive(path) else ingest_zip
-        counts = ingest(conn, path, only_language=only_language, progress=progress)
+        counts = ingest(
+            conn,
+            path,
+            only_language=only_language,
+            progress=progress,
+            skip_unchanged=skip_unchanged,
+        )
         for key in total:
             total[key] += counts[key]
     return total

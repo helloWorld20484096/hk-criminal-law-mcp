@@ -19,7 +19,7 @@ retrievable.
 |---|---|
 | Current legislation | Indexed locally in English and Traditional Chinese. |
 | Historical legislation | Indexed when the official Past Version archives are downloaded and ingested. |
-| Judgments | Fetched on demand from HKLII and cached; coverage grows with use. |
+| Judgments | Locally indexed from an authorised corpus/feed; coverage equals what you import. No built-in LRS/HKLII crawler. |
 | Citator | No. Note-up and authority ranking are research aids, not a citator of record. |
 
 Snapshot: **2026-11-15** (current-version archives plus the English Past
@@ -146,19 +146,25 @@ Historical counts are reported by `hk-law stats` as
 
 ## Case law
 
-Judgments are **demand-driven**:
+Judgments are **local-first**:
 
-1. `search_cases` queries the local cache and HKLII's public search.
-2. `get_case` fetches the full judgment by neutral citation and caches it.
-3. `get_case_paragraphs` retrieves numbered paragraphs.
-4. `note_up` caches HKLII's note-up payload.
-5. `case_graph` returns outgoing cited cases and incoming note-up citations.
-6. `authority_ranking` ranks results by court level and cached note-up data.
-7. `doctrine_research` combines legislation hits with ranked case leads.
+1. `hk-law import-cases` imports an authorised corpus (JSONL/CSV/JSON/SQLite/HTML
+   directory) into `cases`, `case_paragraphs`, and the FTS indexes.
+2. `hk-law sync --citations ...` is a permission-gated citation-list fetch. It
+   requires `HK_LAW_CASE_PERMISSION_REF`; it does not crawl or discover cases.
+3. `search_cases` queries local FTS only by default; `live=True` is an explicit
+   opt-in.
+4. `get_case` / `get_case_paragraphs` read local text; `allow_live=True` is an
+   explicit opt-in.
+5. `note_up` returns cached data; live note-up requires permission.
+6. `case_graph` uses outgoing cited cases and cached incoming citations.
+7. `authority_ranking` ranks local results by court level and cached note-up.
 
-Coverage grows as you use the tool. The initial database contains only the
-cases you have fetched. There is no bundled judgment corpus because the
-Judiciary/HKLII terms do not permit redistribution here.
+Coverage equals what you import. There is no bundled judgment corpus and no
+built-in LRS/HKLII crawler: the LRS `robots.txt` is `Disallow: /`, HKLII's is
+`Disallow: /api`, and both sources restrict automated harvesting. See
+[Fully local pipeline](full-local-pipeline.md) and
+[Permission request template](permission-request-template.md).
 
 ## Recommended coverage for a criminal practice
 

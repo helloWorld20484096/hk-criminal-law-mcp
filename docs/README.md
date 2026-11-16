@@ -12,6 +12,9 @@ that apply to the data.
 | Task | Document |
 |---|---|
 | Understand the modules, data flow, and SQLite schema | [Architecture](architecture.md) |
+| Run a fully local, auto-updating corpus | [Fully local pipeline](full-local-pipeline.md) |
+| Request permission for automated judgment access | [Permission request template](permission-request-template.md) |
+| Audit the repo before a public push or release | [Public release checklist](public-release.md) |
 | Check what is indexed, which Cap. numbers are covered, and what is missing | [Coverage](coverage.md) |
 | Verify a citation or understand the reliability controls | [Reliability model](reliability.md) |
 | Check source terms, attribution, and reuse rules | [Data sources and licensing](data-sources-and-licensing.md) |
@@ -22,7 +25,10 @@ that apply to the data.
 
 | Document | Answers |
 |---|---|
-| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how judgments are fetched and cached; why the design is local-first. |
+| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how judgments are imported and permission-gated; why the design is local-first. |
+| [Fully local pipeline](full-local-pipeline.md) | Incremental legislation sync, judgment import formats, permission-gated citation sync, MCP local-only mode, and the systemd timer. |
+| [Permission request template](permission-request-template.md) | A written request to the Judiciary/HKLII for automated access, with the scope and rate-limit items to settle. |
+| [Public release checklist](public-release.md) | The pre-push audit for judgment text, databases, archives, generated atlas data, and credentials. |
 | [Coverage](coverage.md) | Corpus counts, core criminal Cap. numbers, historical coverage, case-law coverage, and known gaps. |
 | [Reliability model](reliability.md) | Failure modes, verification statuses, provenance, confidence levels, and the audit procedure. |
 | [Data sources and licensing](data-sources-and-licensing.md) | DATA.GOV.HK, Judiciary, and HKLII terms; project licenses; compliance checklist. |

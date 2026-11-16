@@ -6,13 +6,20 @@ __pycache__/
 build/
 dist/
 
-# Downloaded legislation archives and generated indexes are not redistributed.
+# Downloaded legislation archives, judgment exports, and generated indexes
+# are not redistributed.
 data/
+*.zip
+*.jsonl
+*.ndjson
+*.sqlite
+*.sqlite3
 
 # Local runtime state
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 .cache/
 
 # Secret and credential files (never commit)
@@ -29,3 +36,11 @@ id_ed25519*
 credentials.json
 .netrc
 secrets.*
+
+# Semantic map generated data and build output
+semantic_map/data/
+semantic_map/data-*/
+semantic_map/dist/
+semantic_map/dist-*/
+semantic_map/dist-test/
+semantic_map/**/__pycache__/

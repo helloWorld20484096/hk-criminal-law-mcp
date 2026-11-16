@@ -182,6 +182,36 @@ CREATE TABLE IF NOT EXISTS case_search_cache (
     payload TEXT NOT NULL,
     fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Audit trail for every sync/import run. A run that crashes stays 'running'
+-- with a non-null error, so the next sync can report the failed attempt.
+CREATE TABLE IF NOT EXISTS sync_runs (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL,
+    source TEXT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT,
+    status TEXT NOT NULL DEFAULT 'running',
+    stats_json TEXT,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at);
+
+-- Provenance for locally imported judgment corpora. A source row is written
+-- only after an import or an explicitly permission-gated sync.
+CREATE TABLE IF NOT EXISTS case_sources (
+    source TEXT PRIMARY KEY,
+    license TEXT,
+    permission_ref TEXT,
+    base_url TEXT,
+    imported_at TEXT,
+    last_sync_at TEXT,
+    case_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_cases_court_year ON cases(court_code, year);
+CREATE INDEX IF NOT EXISTS idx_cases_judgment_date ON cases(judgment_date);
 """
 
 
@@ -234,10 +264,19 @@ def stats(conn: sqlite3.Connection) -> dict:
     history_sections = one("SELECT COUNT(*) FROM legislation_history_sections")
     cases = one("SELECT COUNT(*) FROM cases")
     paragraphs = one("SELECT COUNT(*) FROM case_paragraphs")
+    case_sources = one("SELECT COUNT(*) FROM case_sources")
+    sync_runs = one("SELECT COUNT(*) FROM sync_runs")
     en = one("SELECT COUNT(*) FROM legislation_sections WHERE language='en'")
     zh = one("SELECT COUNT(*) FROM legislation_sections WHERE language LIKE 'zh%'")
     hist_min = one("SELECT MIN(version_date) FROM legislation_history_docs")
     hist_max = one("SELECT MAX(version_date) FROM legislation_history_docs")
+    cases_by_court = {
+        row["court_code"]: row["n"]
+        for row in conn.execute(
+            "SELECT court_code, COUNT(*) AS n FROM cases "
+            "WHERE court_code IS NOT NULL GROUP BY court_code ORDER BY n DESC"
+        ).fetchall()
+    }
     return {
         "legislation_docs": docs,
         "legislation_sections": sections,
@@ -250,6 +289,14 @@ def stats(conn: sqlite3.Connection) -> dict:
         ),
         "cases": cases,
         "case_paragraphs": paragraphs,
+        "case_sources": case_sources,
+        "cases_by_court": cases_by_court,
+        "sync_runs": sync_runs,
+        "last_case_import": one("SELECT MAX(imported_at) FROM case_sources"),
+        "last_sync": one(
+            "SELECT MAX(finished_at) FROM sync_runs "
+            "WHERE status IN ('ok','partial')"
+        ),
         "database": str(conn.execute("PRAGMA database_list").fetchone()[2]),
         "last_legislation_ingest": one(
             "SELECT MAX(ingested_at) FROM legislation_docs"

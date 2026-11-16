@@ -28,7 +28,13 @@ from .citations import (
     CaseCitation,
     parse_case_citation,
 )
-from .config import HKLII_BASE, REQUEST_INTERVAL_SECONDS, REQUEST_TIMEOUT_SECONDS, USER_AGENT
+from .config import (
+    HKLII_BASE,
+    REQUEST_INTERVAL_SECONDS,
+    REQUEST_TIMEOUT_SECONDS,
+    USER_AGENT,
+    local_only,
+)
 
 ABBR_TO_CODE = {
     "hkcfa": "HKCFA",
@@ -54,6 +60,10 @@ _last_request = 0.0
 
 class HKLIIError(RuntimeError):
     pass
+
+
+class CaseNotLocalError(RuntimeError):
+    """Raised when a case is absent locally and live access is not permitted."""
 
 
 def _throttle() -> None:
@@ -315,9 +325,9 @@ def search_cases(
     year_to: int | None = None,
     limit: int = 20,
     lang: str = "en",
-    live: bool = True,
+    live: bool = False,
 ) -> dict:
-    """Search cached judgments and, unless disabled, HKLII's public search."""
+    """Search locally indexed judgments; live HKLII search is opt-in."""
     local = _search_local(conn, query, court, year_from, year_to, limit, lang)
     live_result = {"source": "disabled", "results": [], "count": 0}
     if live:
@@ -335,8 +345,12 @@ def search_cases(
         "local_count": len(local),
         "live_source": live_result.get("source"),
         "warning": (
-            "HKLII search is an unofficial endpoint. Verify each citation in the "
-            "Judiciary's Legal Reference System or the official judgment text."
+            "Local results only; no live HKLII search was performed. Verify each "
+            "citation in the Judiciary's Legal Reference System or the official "
+            "judgment text."
+            if not live
+            else "HKLII search is an unofficial endpoint. Verify each citation in "
+            "the Judiciary's Legal Reference System or the official judgment text."
         ),
     }
 
@@ -401,7 +415,7 @@ def _case_row_to_dict(row: sqlite3.Row, include_text: bool = True) -> dict:
     return out
 
 
-def _store_case(
+def store_case(
     conn: sqlite3.Connection,
     citation: str,
     meta: dict,
@@ -412,6 +426,8 @@ def _store_case(
     number: str,
     html: str,
     checksum: str,
+    source_url: str | None = None,
+    commit: bool = True,
 ) -> int:
     row = conn.execute(
         "SELECT id FROM cases WHERE neutral_citation=? AND language=?",
@@ -420,6 +436,10 @@ def _store_case(
     parallel = meta.get("parallel_citation")
     if isinstance(parallel, (list, dict)):
         parallel = json.dumps(parallel, ensure_ascii=False)
+    source_url = source_url or (
+        f"{HKLII_BASE}/{'tc' if language != 'en' else 'en'}/cases/"
+        f"{court_code}/{year}/{number}"
+    )
     values = (
         citation,
         meta.get("db"),
@@ -429,7 +449,7 @@ def _store_case(
         parsed.get("title"),
         meta.get("date"),
         language,
-        f"{HKLII_BASE}/{'tc' if language != 'en' else 'en'}/cases/{court_code}/{year}/{number}",
+        source_url,
         meta.get("doc"),
         html,
         parsed.get("text"),
@@ -480,7 +500,8 @@ def _store_case(
         f"INSERT INTO {fts}(rowid, case_id, neutral_citation, title, text) VALUES (?,?,?,?,?)",
         (case_id, case_id, citation, parsed.get("title") or "", parsed.get("text") or ""),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return case_id
 
 
@@ -489,8 +510,14 @@ def get_judgment(
     citation: str,
     lang: str = "en",
     force: bool = False,
+    allow_live: bool = True,
 ) -> dict:
-    """Fetch a judgment by neutral citation, caching it locally."""
+    """Return a judgment from the local corpus, optionally fetching it live.
+
+    ``allow_live=False`` (or ``HK_LAW_LOCAL_ONLY=1``) makes the function
+    strictly local: a missing case raises :class:`CaseNotLocalError` instead of
+    contacting HKLII.
+    """
     parsed_cit = parse_case_citation(citation)
     if not parsed_cit or not parsed_cit.court_abbr:
         raise HKLIIError(f"Unrecognised Hong Kong neutral citation: {citation}")
@@ -500,8 +527,15 @@ def get_judgment(
         "SELECT * FROM cases WHERE neutral_citation=? AND language=?",
         (normalised, language),
     ).fetchone()
-    if row and not force:
+    if row and (not force or local_only()):
         return _case_row_to_dict(row)
+
+    if local_only() or not allow_live:
+        raise CaseNotLocalError(
+            f"{normalised} ({language}) is not in the local judgment corpus. "
+            "Import an authorized corpus, or set allow_live=True only when a "
+            "permitted live source is configured."
+        )
 
     payload = _get_json(
         "api/getjudgment",
@@ -517,7 +551,7 @@ def get_judgment(
     html = payload["content"]
     parsed = _parse_judgment_html(html)
     checksum = hashlib.sha256(html.encode("utf-8", errors="ignore")).hexdigest()
-    _store_case(
+    store_case(
         conn,
         normalised,
         payload,
@@ -543,9 +577,10 @@ def get_case_paragraphs(
     citation: str,
     numbers: list[str],
     lang: str = "en",
+    allow_live: bool = True,
 ) -> dict:
-    """Return selected paragraphs, fetching the judgment first if necessary."""
-    get_judgment(conn, citation, lang=lang)
+    """Return selected paragraphs, fetching the judgment first if permitted."""
+    get_judgment(conn, citation, lang=lang, allow_live=allow_live)
     language = "en" if lang == "en" else "zh-Hant"
     row = conn.execute(
         "SELECT id FROM cases WHERE neutral_citation=? AND language=?",
@@ -581,7 +616,12 @@ def get_case_paragraphs(
     }
 
 
-def note_up(conn: sqlite3.Connection, citation: str, force: bool = False) -> dict:
+def note_up(
+    conn: sqlite3.Connection,
+    citation: str,
+    force: bool = False,
+    allow_live: bool = True,
+) -> dict:
     """Return HKLII's note-up data (documents citing this judgment)."""
     parsed = parse_case_citation(citation)
     if not parsed or not parsed.court_abbr:
@@ -590,17 +630,22 @@ def note_up(conn: sqlite3.Connection, citation: str, force: bool = False) -> dic
     row = conn.execute(
         "SELECT id FROM cases WHERE neutral_citation=? LIMIT 1", (normalised,)
     ).fetchone()
-    if row and not force:
+    if row:
         cached = conn.execute(
             "SELECT payload, fetched_at FROM case_noteups WHERE case_id=?", (row["id"],)
         ).fetchone()
-        if cached:
+        if cached and (not force or local_only()):
             return {
                 "citation": normalised,
                 "payload": json.loads(cached["payload"]),
                 "fetched_at": cached["fetched_at"],
                 "cached": True,
             }
+    if local_only() or not allow_live:
+        raise CaseNotLocalError(
+            f"No cached note-up data for {normalised}. Import the case or enable "
+            "live note-up only with a permitted source."
+        )
     payload = _get_json(
         "api/getcasenoteup",
         {
