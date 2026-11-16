@@ -23,8 +23,11 @@ database. Read this before configuring the timer or importing judgments.
 | Current legislation (EN + ZH) | Yes | DATA.GOV.HK current archives; `hk-law sync` checks ETag/Last-Modified and ingests only changed documents |
 | Historical legislation | Yes, when the Past Version archives are downloaded | `hk-law sync --dataset past` or `--dataset both` |
 | Legislation FTS (EN/ZH) | Yes | Rebuilt incrementally per changed document |
+| DOJ Prosecution Code and policies | Yes | `hk-law sync-doj` (or `hk-law sync`); conditional GETs and checksums |
+| DOJ FTS (EN/ZH) | Yes | Rebuilt incrementally per changed page |
 | Judgment text | Yes, once imported or fetched under permission | `hk-law import-cases` from an authorised corpus, or the permission-gated HKLII citation sync |
 | Judgment FTS (EN/ZH) | Yes | Populated by the import/sync |
+| Semantic atlas | Yes, as a generated static artifact | Rebuild with `make map-all` after a material legislation change |
 | Note-up | Cached locally; live only with permission | `hk-law sync --citations ...` with a permission reference |
 | Live HKLII case search/read | No (default query-time access) | `HK_LAW_LOCAL_ONLY=0` (launcher default); set 1 for local-only; subject to HKLII terms; bulk sync still permission-gated |
 
@@ -66,6 +69,29 @@ What `sync` does:
 The archive URLs and ranges are the official DATA.GOV.HK e-Legislation bulk
 data mapping already used by `download`. Reuse is subject to the DATA.GOV.HK
 terms; attribution is required and the database is not redistributed.
+
+## DOJ policy sync
+
+```bash
+export HK_LAW_DB="$PWD/data/hk_law.db"
+
+# Prosecution Code + domestic-violence policy (English)
+.venv/bin/hk-law sync-doj
+
+# Traditional Chinese pages
+.venv/bin/hk-law sync-doj --lang zh-Hant
+
+# Search and read
+.venv/bin/hk-law search-doj "alternatives to prosecution"
+.venv/bin/hk-law get-doj prosecution_ch5 --paragraphs 5.9
+.venv/bin/hk-law verify-doj "Prosecution Code §5.9"
+```
+
+`sync-doj` fetches the curated pages plus bounded discovery from the two DOJ
+index pages. It uses `If-Modified-Since` and a SHA-256 checksum, stores
+`doj_docs`/`doj_paragraphs`, and records the run in `sync_runs`. DOJ material
+is policy, not legislation or judgment; verify every paragraph against the DOJ
+source.
 
 ## Judgment import
 
@@ -267,6 +293,8 @@ coverage is not counted.
 - Re-importing a large corpus rewrites FTS rows for each case. That is correct
   but slower than a differential import; the importer is idempotent, not
   delta-aware.
+- The semantic atlas is a separate batch build. `sync` does not regenerate
+  embeddings; run `make map-all` after a material legislation update.
 - The database is local and git-ignored. Do not redistribute judgment text.
 
 ## Related

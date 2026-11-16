@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f4ef">
+  <meta name="description" content="A semantic map of the current Hong Kong legislation corpus.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self';">
+  <title>Hong Kong Law Atlas</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HK Law Atlas">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#search">Skip to search</a>
+
+  <noscript><div class="noscript">This atlas needs JavaScript enabled to draw the semantic map. The <a href="https://github.com/helloWorld20484096/hk-criminal-law-mcp">repository documentation</a> remains available without it.</div></noscript>
+
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="brand-copy">
+          <h1>Hong Kong Law Atlas</h1>
+          <p id="subtitle">Semantic map of the current legislation corpus</p>
+        </div>
+      </div>
+
+      <div class="search-shell">
+        <label class="sr-only" for="search">Search the atlas</label>
+        <svg class="search-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="M12.6 12.6 17 17"></path></svg>
+        <input id="search" type="search" placeholder="Search Cap., section, heading, or words…" autocomplete="off" spellcheck="false">
+        <kbd class="search-kbd" aria-hidden="true">/</kbd>
+        <button id="search-clear" class="icon-button search-clear" type="button" aria-label="Clear search" hidden>×</button>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-list" class="text-button" type="button" aria-pressed="false">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"></path></svg>
+          <span>List</span>
+        </button>
+        <button id="btn-filters" class="text-button mobile-only" type="button" aria-controls="sidebar" aria-expanded="false">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M8 15h4"></path></svg>
+          <span>Filters</span>
+        </button>
+        <button id="btn-about" class="text-button" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M10 9v5M10 6.2v.2"></path></svg>
+          <span>About</span>
+        </button>
+        <button id="btn-theme" class="icon-button" type="button" aria-label="Toggle theme" title="Toggle light/dark theme">
+          <svg class="theme-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.2"></circle><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4"></path></svg>
+          <svg class="theme-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.6A6 6 0 0 1 7.4 4.5 6.2 6.2 0 1 0 15.5 12.6Z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside id="sidebar" class="sidebar" aria-label="Explore and filter">
+        <section class="panel search-panel">
+          <div class="panel-heading">
+            <h2>Search results</h2>
+            <span id="search-count" class="count"></span>
+          </div>
+          <div id="search-results" class="result-list" role="listbox" aria-label="Search results">
+            <p class="muted">Search by citation, heading, or phrase.</p>
+          </div>
+        </section>
+
+        <section class="panel filter-panel" id="filter-panel">
+          <div class="panel-heading">
+            <h2>Filters</h2>
+            <button id="clear-filters" class="link-button" type="button">Reset</button>
+          </div>
+
+          <fieldset class="filter-group">
+            <legend>Language</legend>
+            <div class="segmented" role="group" aria-label="Language filter">
+              <button type="button" data-lang="all" class="is-active" aria-pressed="true">All</button>
+              <button type="button" data-lang="en" aria-pressed="false">English</button>
+              <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+            </div>
+          </fieldset>
+
+          <label class="select-label" for="cap-filter">Ordinance</label>
+          <select id="cap-filter" class="select">
+            <option value="all">All Cap. numbers</option>
+          </select>
+
+          <label class="select-label" for="cluster-filter">Cluster</label>
+          <select id="cluster-filter" class="select">
+            <option value="all">All clusters</option>
+          </select>
+
+          <div class="filter-note" id="filter-note"></div>
+        </section>
+
+        <section class="panel cluster-panel">
+          <div class="panel-heading">
+            <h2>Clusters</h2>
+            <span id="cluster-count" class="count"></span>
+          </div>
+          <div id="cluster-legend" class="cluster-legend"></div>
+        </section>
+      </aside>
+
+      <section class="map-wrap" aria-label="Semantic map">
+        <canvas id="map"></canvas>
+        <canvas id="labels" aria-hidden="true"></canvas>
+        <div id="tooltip" class="tooltip" role="status" hidden></div>
+        <div id="map-empty" class="map-empty" hidden>
+          <h2>Nothing matches those filters.</h2>
+          <p>Try a broader search, another language, or reset the filters.</p>
+          <button id="empty-reset" class="primary-button" type="button">Reset filters</button>
+        </div>
+        <div class="map-controls" aria-label="Map controls">
+          <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in">+</button>
+          <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out">−</button>
+          <button id="zoom-fit" class="icon-button" type="button" aria-label="Fit all points">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"></path></svg>
+          </button>
+        </div>
+        <div class="map-status" aria-live="polite">
+          <span id="status-visible">—</span>
+          <span class="status-divider" aria-hidden="true">·</span>
+          <span id="status-selected">Select a point to inspect</span>
+        </div>
+        <div id="hover-card" class="hover-card" hidden></div>
+      </section>
+
+      <aside id="detail" class="detail" aria-label="Selected provision">
+        <div id="detail-empty" class="detail-empty">
+          <h2>Select a point</h2>
+          <p>Click a provision on the map, choose a search result, or press <kbd>L</kbd> to browse the table.</p>
+          <div class="detail-empty-rules">
+            <span class="rule-swatch rule-swatch-a"></span> colour = cluster
+            <span class="rule-swatch rule-swatch-b"></span> larger = schedule
+          </div>
+        </div>
+        <div id="detail-content" class="detail-content" hidden>
+          <div class="detail-head">
+            <div class="detail-kicker">
+              <span id="detail-citation">—</span>
+              <span id="detail-language" class="pill"></span>
+            </div>
+            <button id="detail-close" class="icon-button detail-close" type="button" aria-label="Close inspector">×</button>
+            <h2 id="detail-title">—</h2>
+            <p id="detail-doc" class="detail-doc"></p>
+            <div id="detail-meta" class="meta-row"></div>
+            <div class="detail-actions">
+              <button id="btn-copy" class="small-button" type="button">Copy citation</button>
+              <button id="btn-link" class="small-button" type="button">Copy link</button>
+              <a id="detail-source" class="small-button" href="#" target="_blank" rel="noreferrer">Official source</a>
+              <button id="btn-pair" class="small-button" type="button" hidden>Other language</button>
+              <button id="btn-focus" class="small-button" type="button">Focus neighbours</button>
+            </div>
+          </div>
+          <div class="detail-tabs" role="tablist" aria-label="Inspector sections">
+            <button id="tab-text" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="pane-text">Text</button>
+            <button id="tab-links" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pane-links">Connections</button>
+            <button id="tab-provenance" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pane-provenance">Provenance</button>
+          </div>
+          <div id="pane-text" class="detail-pane" role="tabpanel" aria-labelledby="tab-text">
+            <div id="detail-text" class="provision-text"></div>
+          </div>
+          <div id="pane-links" class="detail-pane" role="tabpanel" aria-labelledby="tab-links" hidden>
+            <h3>Nearest provisions</h3>
+            <p class="muted small">Semantic neighbours in the embedding space. Similarity is not authority.</p>
+            <div id="neighbour-list" class="neighbour-list"></div>
+          </div>
+          <div id="pane-provenance" class="detail-pane" role="tabpanel" aria-labelledby="tab-provenance" hidden>
+            <dl id="provenance-list" class="provenance-list"></dl>
+            <p class="muted small">Source text is the current-version e-Legislation corpus. Check commencement, amendments, and judicial treatment before relying on it.</p>
+          </div>
+        </div>
+        <div id="selection-summary" class="selection-summary" hidden>
+          <div class="selection-head">
+            <div><h2 id="selection-count">0 selected</h2></div>
+            <button id="selection-clear" class="icon-button" type="button" aria-label="Clear selection">×</button>
+          </div>
+          <div id="selection-list" class="result-list"></div>
+          <button id="selection-export" class="primary-button" type="button">Export CSV</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <div class="statusbar-left">
+        <span id="footer-status">Loading corpus…</span>
+      </div>
+      <div class="statusbar-right">
+        <span id="footer-snapshot"></span>
+        <a href="#" id="footer-about">About the map</a>
+      </div>
+    </footer>
+  </div>
+
+  <div id="sidebar-backdrop" class="backdrop" hidden></div>
+
+  <div id="loading" class="loading" role="status" aria-live="polite">
+    <div class="loading-card">
+      <div class="loading-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h2 id="loading-title">Loading the corpus</h2>
+      <p id="loading-detail" class="muted">Preparing the semantic map…</p>
+      <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+      <p id="loading-error" class="loading-error" hidden></p>
+      <button id="loading-retry" class="primary-button" type="button" hidden>Retry</button>
+    </div>
+  </div>
+
+  <div id="filter-sheet" class="sheet" hidden>
+    <div class="sheet-head">
+      <div><h2>Filters</h2></div>
+      <button id="filter-sheet-close" class="icon-button" type="button" aria-label="Close filters">×</button>
+    </div>
+    <div id="filter-sheet-body" class="sheet-body"></div>
+  </div>
+
+  <div id="list-view" class="list-view" role="dialog" aria-modal="true" aria-labelledby="list-title" hidden>
+    <div class="list-head">
+      <div>
+        <h2 id="list-title">Provisions</h2>
+        <p id="list-summary" class="muted"></p>
+      </div>
+      <button id="list-close" class="icon-button" type="button" aria-label="Close list">×</button>
+    </div>
+    <div class="list-toolbar">
+      <label class="sr-only" for="list-search">Filter the list</label>
+      <input id="list-search" type="search" placeholder="Filter by citation, heading, or words…" autocomplete="off">
+      <select id="list-sort" class="select" aria-label="Sort provisions">
+        <option value="cap">Sort by Cap. / section</option>
+        <option value="cluster">Sort by cluster</option>
+        <option value="version">Sort by version date</option>
+      </select>
+      <button id="list-export" class="small-button" type="button">Export CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Citation</th><th>Heading</th><th>Language</th><th>Cluster</th><th>Version</th></tr></thead>
+        <tbody id="list-body"></tbody>
+      </table>
+    </div>
+    <div class="list-pager">
+      <button id="list-prev" class="small-button" type="button">Previous</button>
+      <span id="list-page">Page 1</span>
+      <button id="list-next" class="small-button" type="button">Next</button>
+    </div>
+  </div>
+
+  <div id="about" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <div class="modal-head">
+        <div><h2 id="about-title">Hong Kong Law Atlas</h2></div>
+        <button id="about-close" class="icon-button" type="button" aria-label="Close about">×</button>
+      </div>
+      <div class="modal-body" id="about-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

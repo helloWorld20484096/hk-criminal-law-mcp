@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLOBAL_HOME="${HK_LAW_GLOBAL_HOME:-$HOME/.local/share/hk-criminal-law-mcp}"
 SKILLS_HOME="$HOME/.claude/skills/hk-criminal-law"
+SEMANTIC_MAP="$ROOT/semantic_map/dist/data"
 
 command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 command -v claude >/dev/null || { echo "Claude Code CLI is required" >&2; exit 1; }
@@ -48,6 +49,7 @@ fi
 claude mcp add --scope user hk-criminal-law \
   -e "HK_LAW_DB=$GLOBAL_HOME/hk_law.db" \
   -e "HK_LAW_LOCAL_ONLY=0" \
+  -e "HK_LAW_SEMANTIC_MAP=$SEMANTIC_MAP" \
   -- "$GLOBAL_HOME/venv/bin/python" -m hk_criminal_law_mcp.server
 
 echo

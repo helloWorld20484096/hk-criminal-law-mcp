@@ -39,6 +39,7 @@ from .config import (
     local_only,
 )
 from .db import stats
+from .doj import doj_status, sync_doj
 from .hklii import _parse_judgment_html, get_judgment, store_case
 from .ingest_legislation import (
     CURRENT_ARCHIVES,
@@ -712,6 +713,9 @@ def run_sync(
     force: bool = False,
     include_legislation: bool = True,
     include_cases: bool = True,
+    include_doj: bool = True,
+    doj_language: str = "en",
+    doj_base_url: str | None = None,
     cases_dir: str | Path | None = None,
     case_format: str = "auto",
     citations: str | Path | Iterable[str] | None = None,
@@ -724,6 +728,7 @@ def run_sync(
         "legislation": None,
         "cases_import": None,
         "cases_sync": None,
+        "doj": None,
     }
     if include_legislation:
         result["legislation"] = sync_legislation(
@@ -757,6 +762,17 @@ def run_sync(
                 )
             except PermissionRequiredError as exc:
                 result["cases_sync"] = {"status": "blocked", "reason": str(exc)}
+
+    if include_doj:
+        try:
+            result["doj"] = sync_doj(
+                conn,
+                language=doj_language,
+                base_url=doj_base_url,
+                progress=progress,
+            )
+        except Exception as exc:
+            result["doj"] = {"status": "failed", "error": str(exc)}
     return result
 
 
@@ -822,6 +838,12 @@ def _coverage(conn: sqlite3.Connection) -> dict:
             "The local judgment corpus is not comprehensive. Import an authorised "
             "corpus, or set HK_LAW_LOCAL_ONLY=0 for permitted live HKLII access."
         )
+    doj_count = conn.execute("SELECT COUNT(*) FROM doj_docs").fetchone()[0]
+    if not doj_count:
+        gaps.append(
+            "DOJ Prosecution Code and prosecution policies are not indexed. "
+            "Run: hk-law sync-doj"
+        )
     if age_days is not None and age_days > 7:
         gaps.append(
             f"Last successful sync was {int(age_days)} days ago. Run: hk-law sync"
@@ -862,6 +884,7 @@ def sync_status(conn: sqlite3.Connection) -> dict:
             "case_source_url": case_source_url(),
             "case_import_dir": str(case_import_dir()) if case_import_dir() else None,
             "case_citations_file": str(case_citations_file()) if case_citations_file() else None,
+            "doj": doj_status(conn),
             "case_source_rows": [
                 dict(row)
                 for row in conn.execute(

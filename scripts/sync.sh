@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One-shot local corpus sync. Safe to run from cron or a systemd user timer.
 #
-#   ./scripts/sync.sh                 # legislation only, plus any env-configured cases
+#   ./scripts/sync.sh                 # legislation + DOJ, plus any env-configured cases
+#   ./scripts/sync.sh --no-doj        # skip the DOJ publications
 #   ./scripts/sync.sh --dataset both  # also refresh historical legislation
 #
 # Case access is permission-gated. Set these only after reading
@@ -16,6 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 export HK_LAW_DB="${HK_LAW_DB:-$ROOT/data/hk_law.db}"
 export HK_LAW_DATA_DIR="${HK_LAW_DATA_DIR:-$ROOT/data/raw}"
+export HK_LAW_SEMANTIC_MAP="${HK_LAW_SEMANTIC_MAP:-$ROOT/semantic_map/dist/data}"
 
 if [[ -x "$ROOT/.venv/bin/hk-law" ]]; then
   HK_LAW="$ROOT/.venv/bin/hk-law"

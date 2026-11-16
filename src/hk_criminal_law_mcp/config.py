@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "hk-criminal-law-mcp"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 # Public endpoints. These are free-to-access sources, subject to their own terms.
 HKLII_BASE = os.environ.get("HK_LAW_HKLII_BASE", "https://www.hklii.hk").rstrip("/")
@@ -16,6 +16,12 @@ ELEGISLATION_BASE = os.environ.get(
 DATA_GOV_BASE = os.environ.get(
     "HK_LAW_DATA_GOV_BASE", "https://resource.data.one.gov.hk/doj/data"
 ).rstrip("/")
+DOJ_BASE = os.environ.get("HK_LAW_DOJ_BASE", "https://www.doj.gov.hk").rstrip("/")
+
+# DOJ pages are static and small; a shorter interval than HKLII is still polite.
+DOJ_REQUEST_INTERVAL_SECONDS = float(
+    os.environ.get("HK_LAW_DOJ_REQUEST_INTERVAL", "0.5")
+)
 
 # Be polite to public services. HKLII is a small public-interest service.
 REQUEST_INTERVAL_SECONDS = float(os.environ.get("HK_LAW_REQUEST_INTERVAL", "1.5"))

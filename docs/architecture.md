@@ -19,9 +19,11 @@ All modules live under `src/hk_criminal_law_mcp/`.
 - **`ingest_legislation.py`** — Downloader and current/historical indexers.
 - **`citations.py`** — Cap./section and neutral-citation parsing/extraction.
 - **`search.py`** — Legislation search, ranges, history, verification.
+- **`doj.py`** — DOJ Prosecution Code and policy fetcher, parser, FTS retrieval,
+  citation verification, and status.
 - **`hklii.py`** — Judgment/search/note-up client and cache; local-only guard.
-- **`sync.py`** — Incremental legislation sync, authorised judgment import,
-  permission-gated citation sync, and sync status.
+- **`sync.py`** — Incremental legislation sync, DOJ sync, authorised judgment
+  import, permission-gated citation sync, and sync status.
 - **`research.py`** — Doctrine/sentencing/authority/citation-graph packs.
 - **`server.py`** — MCP tools (FastMCP/MCPServer, stdio).
 - **`cli.py`** — `hk-law` command line.
@@ -58,6 +60,25 @@ The parser:
   separate `source_note`;
 - makes storage keys unique with `temporalId` where section numbers repeat
   across Parts/Orders.
+
+### DOJ policy publications
+
+The DOJ publishes the Prosecution Code and the domestic-violence prosecution
+policy as static HTML pages. `hk-law sync-doj` (or the `sync` command) fetches
+the curated seed pages, optionally discovers additional pages from the two
+index pages, and stores each page in `doj_docs` plus its paragraphs in
+`doj_paragraphs` and the `doj_fts_*` indexes.
+
+- Conditional GETs use the stored HTTP `Last-Modified` value; a SHA-256
+  checksum of the page content catches changes when the server does not return
+  `304`.
+- The default interval is 0.5 s. Only the known DOJ index pages are read for
+  discovery; there is no arbitrary crawler.
+- `search_doj`, `get_doj_document`, `list_doj_documents`, `verify_doj` and
+  `doj_status` read the local corpus. The DOJ tools are policy retrieval, not
+  legislation or judgment retrieval.
+- `doj_sources` records the source, licence note, base URL, last sync time and
+  document count.
 
 ### Judgments
 
@@ -112,9 +133,13 @@ explicitly refreshed.
 | `cases` | cached judgments and metadata |
 | `case_paragraphs` | numbered paragraphs |
 | `cases_fts_en` / `cases_fts_zh` | judgment full-text indexes |
+| `doj_docs` | DOJ publication pages (Prosecution Code, domestic-violence policy) |
+| `doj_paragraphs` | parsed DOJ paragraphs with optional paragraph numbers/headings |
+| `doj_fts_en` / `doj_fts_zh` | DOJ paragraph full-text indexes |
+| `doj_sources` | provenance for the DOJ source |
 | `case_noteups` | note-up payload cache |
 | `case_search_cache` | search-response cache |
-| `sync_runs` | one row per legislation/case sync or import, with JSON stats and error |
+| `sync_runs` | one row per legislation/DOJ/case sync or import, with JSON stats and error |
 | `case_sources` | provenance for imported/authorised judgment sources |
 | `meta` | schema/sync metadata, archive ETag/Last-Modified |
 
@@ -145,7 +170,7 @@ a table alias. This is why the queries spell out `legislation_fts_en` etc.
   source distribution.
 - `scripts/run_mcp.sh` defaults `HK_LAW_LOCAL_ONLY=0` (live HKLII case
   queries); set it to 1 for a local-only MCP. `scripts/sync.sh` performs the
-  explicit legislation update.
+  explicit legislation and DOJ update; pass `--no-doj` to skip the DOJ pages.
 - `scripts/install_sync_timer.sh` installs `hk-law-sync.service` and
   `hk-law-sync.timer` under `~/.config/systemd/user/`. Permission-gated case
   variables live in `~/.config/hk-law-sync.env` (mode 0600), not in the unit.

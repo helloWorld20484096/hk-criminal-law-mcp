@@ -6,6 +6,7 @@ tool commercially.
 
 [Documentation index](README.md) · On this page:
 [At a glance](#at-a-glance) · [e-Legislation](#hong-kong-e-legislation-legislation) ·
+[DOJ policy publications](#doj-policy-publications) ·
 [Judiciary judgments](#hong-kong-judiciary--legal-reference-system-judgments) ·
 [HKLII](#hklii-case-retrieval-and-search) ·
 [Bill of Rights and constitutional instruments](#hong-kong-bill-of-rights-and-constitutional-instruments) ·
@@ -17,7 +18,7 @@ tool commercially.
 |---|---|---|
 | Code | `src/`, `tests/`, `scripts/` | Apache-2.0 |
 | Skills and docs | `skills/`, `docs/` | CC BY 4.0 |
-| Downloaded data | `data/` and the SQLite corpus | DATA.GOV.HK, Judiciary, and HKLII terms |
+| Downloaded data | `data/` and the SQLite corpus | DATA.GOV.HK, DOJ, Judiciary, and HKLII terms |
 
 This project distinguishes **code**, **skills/docs**, and **downloaded data**.
 They have different licenses and different obligations.
@@ -52,6 +53,25 @@ download. The Past Version archives are official historical versions; when
 ingested, `statute_history` returns the latest official version dated on or
 before the requested date. Coverage depends on which past archives/languages
 were ingested. Commencement timelines are not reconstructed.
+
+## DOJ policy publications
+
+**Source:** Department of Justice, <https://www.doj.gov.hk/> — the Prosecution
+Code and the domestic-violence prosecution policy pages.
+
+**Terms:** Government of the Hong Kong SAR public information. The project:
+
+- fetches only the curated Prosecution Code and domestic-violence policy pages,
+  plus shallow discovery from their two index pages;
+- identifies itself with a project User-Agent and uses a 0.5-second default
+  interval;
+- caches the pages and paragraphs in the local SQLite corpus;
+- does not redistribute the pages or the database.
+
+DOJ publications are **policy material, not legislation or judgments**. Cite
+the page title, paragraph number if any, version date and source URL. Do not
+present a DOJ policy paragraph as a statutory provision or a judicial
+authority. Verify every paragraph against the DOJ source.
 
 ## Hong Kong Judiciary — Legal Reference System (judgments)
 
@@ -144,6 +164,7 @@ template is [here](permission-request-template.md).
 - [ ] I did not redistribute the bulk archives or the SQLite database.
 - [ ] I checked the Judiciary/HKLII terms before commercial use.
 - [ ] I did not present the local copy as the official text.
+- [ ] I did not present a DOJ policy paragraph as legislation or a judgment.
 - [ ] I did not crawl the LRS or HKLII without written permission.
 - [ ] Any automated case access uses an explicit citation list and a recorded
       permission reference.

@@ -64,8 +64,10 @@ not add it to CI or release assets.
 
 Before publishing a release:
 
-- [ ] The database contains legislation only (`cases` count is 0).
-- [ ] No archive, judgment export, or semantic `dist*/` is attached.
+- [ ] The database contains legislation only (`cases` count is 0 and `doj_docs`
+      count is 0) if a database asset is published.
+- [ ] No archive, judgment export, DOJ page export, or semantic `dist*/` is
+      attached.
 - [ ] No `.env`, permission reference, or credential is attached.
 - [ ] The README links to the [fully local pipeline](full-local-pipeline.md)
       and [permission request template](permission-request-template.md).

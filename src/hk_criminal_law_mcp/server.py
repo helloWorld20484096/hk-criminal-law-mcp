@@ -14,6 +14,14 @@ except ImportError:  # MCP SDK 2.x renamed FastMCP to MCPServer
 
 from .config import DISCLAIMER, live_case_default
 from .db import connect, stats
+from .doj import (
+    doj_status as _doj_status,
+    get_doj_document as _get_doj_document,
+    list_doj_documents as _list_doj_documents,
+    search_doj as _search_doj,
+    sync_doj as _sync_doj,
+    verify_doj_citation as _verify_doj_citation,
+)
 from .hklii import get_case_paragraphs as _get_case_paragraphs
 from .hklii import get_judgment, note_up as _note_up, search_cases as _search_cases
 from .research import (
@@ -23,6 +31,8 @@ from .research import (
     sentencing_research as _sentencing_research,
 )
 from .sync import sync_status as _sync_status
+from .semantic_index import get_index as _get_semantic_index
+from .semantic_index import index_error as _semantic_index_error
 from .search import (
     get_section as _get_section,
     get_section_range as _get_section_range,
@@ -37,14 +47,18 @@ from .search import (
 mcp = _MCPServer(
     "hk-criminal-law",
     instructions=(
-        "Hong Kong criminal law and defence research. Case search/read uses live "
-        "HKLII by default so results are current; set HK_LAW_LOCAL_ONLY=1 for a "
-        "strictly local MCP. Agent protocol: call corpus_status or sync_status "
-        "first; use search_legislation and search_cases for discovery, then "
-        "get_section, statute_history, search_cases, and get_case_paragraphs for "
-        "primary text; run verify_citations over every citation before relying on "
-        "it; label anything unverified [UNVERIFIED]. This server is a retrieval "
-        "aid, not a citator of record and not legal advice."
+        "Hong Kong criminal law and defence research. This server is local-first: "
+        "search_cases and get_case read the local corpus by default; live HKLII "
+        "or LRS retrieval is available only when a permitted source is configured "
+        "and the caller explicitly opts in. Agent protocol: call corpus_status or "
+        "sync_status first; search the DOJ Prosecution Code and prosecution "
+        "policies with search_doj and read them with get_doj_document; use "
+        "semantic_search and semantic_neighbors for discovery, then get_section, "
+        "statute_history, search_cases, and get_case_paragraphs for primary text; "
+        "run verify_citations (and verify_doj for DOJ policy citations) before "
+        "relying on anything; label anything unverified [UNVERIFIED]. The "
+        "semantic atlas is a discovery aid, not authority. This server is a "
+        "retrieval aid, not a citator of record and not legal advice."
     ),
 )
 
@@ -435,6 +449,233 @@ def sync_status() -> dict:
         return _ok(_sync_status(conn))
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Department of Justice (DOJ) publications
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def search_doj(
+    query: str,
+    category: str | None = None,
+    lang: str = "en",
+    limit: int = 8,
+    include_text: bool = False,
+    max_chars: int = 4000,
+) -> dict:
+    """Search the DOJ Prosecution Code and prosecution policies.
+
+    The local DOJ corpus covers the Prosecution Code and the domestic-violence
+    prosecution policy. ``category`` is ``prosecution_code`` or
+    ``domestic_violence``. This is policy material, not legislation; read the
+    full page before relying on a paragraph.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _search_doj(
+                conn,
+                query,
+                category=category,
+                language=lang,
+                limit=limit,
+                include_text=include_text,
+                max_chars=max_chars,
+            )
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def get_doj_document(
+    slug: str,
+    lang: str = "en",
+    paragraphs: list[str] | None = None,
+    max_chars: int = 20000,
+) -> dict:
+    """Read a DOJ publication by slug, e.g. ``prosecution_ch5``.
+
+    Args:
+        slug: e.g. ``prosecution_ch5`` or ``domesticviolence_11``.
+        lang: ``en`` or ``zh-Hant``.
+        paragraphs: Optional paragraph numbers/ranges, e.g. ``["5.9"]`` or
+            ``["14-17"]``.
+        max_chars: Truncate the full text to this many characters.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _get_doj_document(
+                conn,
+                slug,
+                language=lang,
+                paragraphs=paragraphs,
+                max_chars=max_chars,
+            )
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def list_doj_documents(
+    category: str | None = None, lang: str = "en", limit: int = 200
+) -> dict:
+    """List indexed DOJ publications and their paragraph counts."""
+    conn = _db()
+    try:
+        return _ok(
+            _list_doj_documents(
+                conn, category=category, language=lang, limit=limit
+            )
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def verify_doj(
+    citation: str, category: str | None = None, lang: str = "en"
+) -> dict:
+    """Verify a DOJ policy citation, e.g. ``Prosecution Code §5.9``.
+
+    This checks the local DOJ corpus only. It is not a citator and does not
+    verify that the paragraph supports a proposition.
+    """
+    conn = _db()
+    try:
+        return _ok(
+            _verify_doj_citation(
+                conn, citation, category=category, language=lang
+            )
+        )
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def doj_status() -> dict:
+    """Report DOJ corpus coverage, freshness and provenance."""
+    conn = _db()
+    try:
+        return _ok(_doj_status(conn))
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def sync_doj(force: bool = False, lang: str = "en") -> dict:
+    """Incrementally update the local DOJ corpus.
+
+    Fetches the curated Prosecution Code and domestic-violence policy pages
+    (plus bounded discovery from their index pages), using conditional GETs and
+    checksums. It is polite and may take 20–60 seconds. The full daily update is
+    also available as ``hk-law sync-doj``.
+    """
+    conn = _db()
+    try:
+        result = _sync_doj(conn, force=force, language=lang)
+        return _ok({**result, "corpus": _doj_status(conn)})
+    finally:
+        conn.close()
+
+
+def _semantic_payload(index):
+    if index is not None:
+        return index, None
+    return None, {
+        "available": False,
+        "error": _semantic_index_error() or "Semantic atlas data is not available.",
+        "build": (
+            "Run `make map-all` in the repository and set HK_LAW_SEMANTIC_MAP "
+            "to semantic_map/dist/data."
+        ),
+    }
+
+
+@mcp.tool()
+def semantic_status() -> dict:
+    """Report whether the semantic atlas is available and what it covers."""
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(index.status())
+
+
+@mcp.tool()
+def semantic_search(
+    query: str,
+    limit: int = 10,
+    cluster: str | int | None = None,
+    language: str | None = None,
+) -> dict:
+    """Search the semantic atlas's citation/heading index for provisions.
+
+    This is a metadata/keyword lookup over the generated atlas; use
+    `semantic_neighbors` for nearest-neighbour discovery. `cluster` accepts a
+    cluster id or a label fragment; `language` is `en` or `zh-Hant`. Read the
+    provision with `get_section` and verify it with `verify_citation` before
+    relying on it.
+    """
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(index.search(query, limit=limit, cluster=cluster, language=language))
+
+
+@mcp.tool()
+def semantic_locate(citation: str, language: str | None = None) -> dict:
+    """Find a legislation citation's point(s) and cluster in the semantic atlas."""
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(index.locate(citation, language=language))
+
+
+@mcp.tool()
+def semantic_neighbors(
+    point_id: int | None = None,
+    citation: str | None = None,
+    language: str | None = None,
+    limit: int = 10,
+) -> dict:
+    """Return provisions nearest to a point or citation in the semantic atlas.
+
+    Similarity is semantic, not authority or treatment. Verify every result with
+    `get_section` and `verify_citation`.
+    """
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(
+        index.neighbors(
+            point_id=point_id,
+            citation=citation,
+            language=language,
+            limit=limit,
+        )
+    )
+
+
+@mcp.tool()
+def semantic_clusters(query: str | None = None, limit: int = 50) -> dict:
+    """List semantic-atlas topics, optionally filtered by label or Cap. title."""
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(index.clusters_list(query=query, limit=limit))
+
+
+@mcp.tool()
+def semantic_cluster(cluster_id: int, limit: int = 20) -> dict:
+    """Show one semantic topic and representative member provisions."""
+    index, error = _semantic_payload(_get_semantic_index())
+    if index is None:
+        return _ok(error)
+    return _ok(index.cluster(cluster_id, limit=limit))
 
 
 def main() -> None:
