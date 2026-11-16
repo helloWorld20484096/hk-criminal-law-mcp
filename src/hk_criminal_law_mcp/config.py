@@ -84,6 +84,18 @@ def local_only() -> bool:
     }
 
 
+def live_case_default() -> bool:
+    """Return True when case reads should use the permitted live source.
+
+    This is the inverse of :func:`local_only`. The public launcher sets
+    ``HK_LAW_LOCAL_ONLY=1``, so live access is off by default. An operator who
+    needs query-time coverage of the whole HKLII database can set
+    ``HK_LAW_LOCAL_ONLY=0``; the MCP tool defaults then use live retrieval,
+    subject to HKLII's terms. Bulk sync still requires a permission reference.
+    """
+    return not local_only()
+
+
 def case_permission_ref() -> str | None:
     """Return the written-permission reference for automated case access.
 

@@ -146,23 +146,25 @@ Historical counts are reported by `hk-law stats` as
 
 ## Case law
 
-Judgments are **local-first**:
+Judgments are **live-first with optional local import**:
 
-1. `hk-law import-cases` imports an authorised corpus (JSONL/CSV/JSON/SQLite/HTML
+1. `search_cases` merges local FTS results with live HKLII search by default
+   (`HK_LAW_LOCAL_ONLY=0`); set `HK_LAW_LOCAL_ONLY=1` for local-only.
+2. `get_case` / `get_case_paragraphs` read local text first and fetch a missing
+   case from HKLII in live mode.
+3. `hk-law import-cases` imports an authorised corpus (JSONL/CSV/JSON/SQLite/HTML
    directory) into `cases`, `case_paragraphs`, and the FTS indexes.
-2. `hk-law sync --citations ...` is a permission-gated citation-list fetch. It
+4. `hk-law sync --citations ...` is a permission-gated citation-list fetch. It
    requires `HK_LAW_CASE_PERMISSION_REF`; it does not crawl or discover cases.
-3. `search_cases` queries local FTS only by default; `live=True` is an explicit
-   opt-in.
-4. `get_case` / `get_case_paragraphs` read local text; `allow_live=True` is an
-   explicit opt-in.
-5. `note_up` returns cached data; live note-up requires permission.
-6. `case_graph` uses outgoing cited cases and cached incoming citations.
-7. `authority_ranking` ranks local results by court level and cached note-up.
+5. `note_up` and `case_graph` use live note-up data in live mode, cached data
+   in local-only mode.
+6. `authority_ranking` ranks results by court level and note-up data.
 
-Coverage equals what you import. There is no bundled judgment corpus and no
-built-in LRS/HKLII crawler: the LRS `robots.txt` is `Disallow: /`, HKLII's is
-`Disallow: /api`, and both sources restrict automated harvesting. See
+Local coverage equals what you import. There is no bundled judgment corpus and
+no built-in LRS/HKLII crawler: the LRS `robots.txt` is `Disallow: /`, HKLII's is
+`Disallow: /api`, and both sources restrict automated harvesting. Live mode is
+query-time access subject to HKLII's terms, not a local copy. `sync_status`
+reports local coverage and gaps. See
 [Fully local pipeline](full-local-pipeline.md) and
 [Permission request template](permission-request-template.md).
 

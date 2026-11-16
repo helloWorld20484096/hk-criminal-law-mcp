@@ -181,8 +181,9 @@ def build_parser() -> argparse.ArgumentParser:
     search_cases_p.add_argument("--limit", type=int, default=10)
     search_cases_p.add_argument("--lang", default="en")
     search_cases_p.add_argument(
-        "--live", action="store_true", help="Also query HKLII (permission required)"
+        "--local-only", action="store_true", help="Do not contact HKLII"
     )
+    search_cases_p.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
     search_cases_p.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     get_case_p = sub.add_parser("get-case", help="Read or fetch a judgment")
@@ -198,8 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("citation")
     verify.add_argument("--lang", default="en")
     verify.add_argument(
-        "--live", action="store_true", help="Allow a live HKLII check if permitted"
+        "--local-only", action="store_true", help="Do not contact HKLII"
     )
+    verify.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
     verify.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     verify_text = sub.add_parser(
@@ -207,7 +209,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_text.add_argument("text")
     verify_text.add_argument("--lang", default="en")
-    verify_text.add_argument("--live", action="store_true")
+    verify_text.add_argument(
+        "--local-only", action="store_true", help="Do not contact HKLII"
+    )
+    verify_text.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
 
     note = sub.add_parser("note-up", help="Read cached or permitted note-up data")
     note.add_argument("citation")
@@ -223,7 +228,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctrine.add_argument("--lang", default="en")
     doctrine.add_argument("--legislation-limit", type=int, default=5)
     doctrine.add_argument("--case-limit", type=int, default=5)
-    doctrine.add_argument("--live-cases", action="store_true")
+    doctrine.add_argument(
+        "--local-only", action="store_true", help="Do not contact HKLII"
+    )
 
     sentencing = sub.add_parser(
         "sentencing", help="Penalty text + sentencing case leads"
@@ -232,7 +239,9 @@ def build_parser() -> argparse.ArgumentParser:
     sentencing.add_argument("section")
     sentencing.add_argument("--lang", default="en")
     sentencing.add_argument("--case-limit", type=int, default=5)
-    sentencing.add_argument("--live-cases", action="store_true")
+    sentencing.add_argument(
+        "--local-only", action="store_true", help="Do not contact HKLII"
+    )
 
     authority = sub.add_parser(
         "authority", help="Rank case results by court level and cached note-up"
@@ -241,7 +250,9 @@ def build_parser() -> argparse.ArgumentParser:
     authority.add_argument("--court")
     authority.add_argument("--limit", type=int, default=10)
     authority.add_argument("--lang", default="en")
-    authority.add_argument("--live", action="store_true")
+    authority.add_argument(
+        "--local-only", action="store_true", help="Do not contact HKLII"
+    )
 
     graph = sub.add_parser(
         "case-graph", help="Outgoing and incoming citations for a case"
@@ -249,8 +260,9 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("citation")
     graph.add_argument("--lang", default="en")
     graph.add_argument(
-        "--live", action="store_true", help="Include live note-up if permitted"
+        "--local-only", action="store_true", help="Do not contact HKLII"
     )
+    graph.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
     graph.add_argument("--no-live", action="store_true", help=argparse.SUPPRESS)
 
     sub.add_parser("serve", help="Run the MCP server on stdio")
@@ -415,7 +427,7 @@ def main(argv: list[str] | None = None) -> None:
                     year_to=args.year_to,
                     limit=args.limit,
                     lang=args.lang,
-                    live=args.live and not args.no_live,
+                    live=not args.local_only and not args.no_live,
                 )
             )
         elif args.command == "get-case":
@@ -446,13 +458,13 @@ def main(argv: list[str] | None = None) -> None:
                     conn,
                     args.citation,
                     lang=args.lang,
-                    live=args.live and not args.no_live,
+                    live=not args.local_only and not args.no_live,
                 )
             )
         elif args.command == "verify-text":
             _dump(
                 verify_citations(
-                    conn, args.text, lang=args.lang, live=args.live
+                    conn, args.text, lang=args.lang, live=not args.local_only
                 )
             )
         elif args.command == "doctrine":
@@ -463,7 +475,7 @@ def main(argv: list[str] | None = None) -> None:
                     lang=args.lang,
                     legislation_limit=args.legislation_limit,
                     case_limit=args.case_limit,
-                    live_cases=args.live_cases,
+                    live_cases=not args.local_only,
                 )
             )
         elif args.command == "sentencing":
@@ -474,7 +486,7 @@ def main(argv: list[str] | None = None) -> None:
                     args.section,
                     lang=args.lang,
                     case_limit=args.case_limit,
-                    live_cases=args.live_cases,
+                    live_cases=not args.local_only,
                 )
             )
         elif args.command == "authority":
@@ -485,7 +497,7 @@ def main(argv: list[str] | None = None) -> None:
                     court=args.court,
                     limit=args.limit,
                     lang=args.lang,
-                    live=args.live,
+                    live=not args.local_only,
                 )
             )
         elif args.command == "case-graph":
@@ -494,7 +506,7 @@ def main(argv: list[str] | None = None) -> None:
                     conn,
                     args.citation,
                     lang=args.lang,
-                    live_note_up=args.live and not args.no_live,
+                    live_note_up=not args.local_only and not args.no_live,
                 )
             )
         elif args.command == "note-up":

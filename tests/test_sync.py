@@ -3,6 +3,7 @@ import zipfile
 
 import pytest
 
+from hk_criminal_law_mcp.config import live_case_default
 from hk_criminal_law_mcp.db import stats
 from hk_criminal_law_mcp.hklii import (
     CaseNotLocalError,
@@ -117,6 +118,29 @@ def test_sync_status_reports_provenance(conn, tmp_path):
     assert status["cases"] == 1
     assert status["case_source_rows"][0]["source"] == "test-corpus"
     assert status["permission_configured"] is False
+    assert status["coverage"]["judgments"]["cases"] == 1
+    assert any("judgment corpus" in gap for gap in status["coverage"]["gaps"])
+
+
+def test_live_case_default_follows_local_only(monkeypatch):
+    monkeypatch.setenv("HK_LAW_LOCAL_ONLY", "1")
+    assert live_case_default() is False
+    monkeypatch.setenv("HK_LAW_LOCAL_ONLY", "0")
+    assert live_case_default() is True
+
+
+def test_live_search_failure_falls_back_to_local(conn, tmp_path, monkeypatch):
+    path = _write_jsonl(tmp_path / "corpus.jsonl", [CASE])
+    import_cases(conn, path, source="test-corpus")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("HKLII down")
+
+    monkeypatch.setattr("hk_criminal_law_mcp.hklii._search_live", boom)
+    result = search_cases(conn, "bail conditions", live=True)
+    assert result["local_count"] == 1
+    assert result["live_error"] == "HKLII down"
+    assert result["results"][0]["citation"] == "[2021] HKCFA 1"
 
 
 def test_skip_unchanged_legislation(conn, tmp_path):

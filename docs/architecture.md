@@ -61,10 +61,11 @@ The parser:
 
 ### Judgments
 
-The MCP is local-first. `search_cases`, `get_case`, `get_case_paragraphs`, and
-`verify_citation` read SQLite by default. Live HKLII access requires an explicit
-`live=True` / `allow_live=True` and is disabled entirely when
-`HK_LAW_LOCAL_ONLY=1` (the launcher default).
+The MCP is **live-first for case search/read**: `search_cases`, `get_case`,
+`get_case_paragraphs`, `verify_citation`, `note_up`, and `case_graph` default to
+live HKLII when `HK_LAW_LOCAL_ONLY=0` (the launcher default). Set
+`HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. Live search failures fall back
+to local results with `live_error`.
 
 Judgments enter the local corpus in one of two ways:
 
@@ -142,8 +143,9 @@ a table alias. This is why the queries spell out `legislation_fts_en` etc.
   and re-inserts that document's sections and FTS rows.
 - The downloaded archives and database are git-ignored and are not part of the
   source distribution.
-- `scripts/run_mcp.sh` exports `HK_LAW_LOCAL_ONLY=1`; the MCP then never
-  contacts HKLII or the LRS. `scripts/sync.sh` performs the explicit update.
+- `scripts/run_mcp.sh` defaults `HK_LAW_LOCAL_ONLY=0` (live HKLII case
+  queries); set it to 1 for a local-only MCP. `scripts/sync.sh` performs the
+  explicit legislation update.
 - `scripts/install_sync_timer.sh` installs `hk-law-sync.service` and
   `hk-law-sync.timer` under `~/.config/systemd/user/`. Permission-gated case
   variables live in `~/.config/hk-law-sync.env` (mode 0600), not in the unit.

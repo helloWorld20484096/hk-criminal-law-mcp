@@ -13,7 +13,7 @@ database. Read this before configuring the timer or importing judgments.
 [Documentation index](README.md) · On this page:
 [What is local](#what-is-local) · [Legislation sync](#legislation-sync) ·
 [Judgment import](#judgment-import) · [Permission-gated HKLII sync](#permission-gated-hklii-sync) ·
-[MCP local-only mode](#mcp-local-only-mode) · [Scheduler](#scheduler) ·
+[MCP live default](#mcp-live-default-and-local-only-opt-out) · [Scheduler](#scheduler) ·
 [State and audit](#state-and-audit) · [Known limits](#known-limits)
 
 ## What is local
@@ -26,9 +26,12 @@ database. Read this before configuring the timer or importing judgments.
 | Judgment text | Yes, once imported or fetched under permission | `hk-law import-cases` from an authorised corpus, or the permission-gated HKLII citation sync |
 | Judgment FTS (EN/ZH) | Yes | Populated by the import/sync |
 | Note-up | Cached locally; live only with permission | `hk-law sync --citations ...` with a permission reference |
+| Live HKLII case search/read | No (default query-time access) | `HK_LAW_LOCAL_ONLY=0` (launcher default); set 1 for local-only; subject to HKLII terms; bulk sync still permission-gated |
 
-The MCP server never needs a live legal database to answer a local query. It
-reads SQLite. Network access is limited to an explicit sync run.
+Legislation is local. Case search/read defaults to live HKLII so results are
+current; set `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. The repository
+stores no judgment text. See
+[MCP live default and local-only opt-out](#mcp-live-default-and-local-only-opt-out).
 
 ## Legislation sync
 
@@ -160,27 +163,48 @@ from the permission letter before it can be wired. Until then, use an
 authorised corpus import or a permitted citation list. See the
 [permission request template](permission-request-template.md).
 
-## MCP local-only mode
+## MCP live default and local-only opt-out
 
-The project launcher exports `HK_LAW_LOCAL_ONLY=1` by default:
+The project launcher defaults to **live HKLII query-time access** for case
+search/read (`HK_LAW_LOCAL_ONLY=0`). This keeps results current; it is not a
+local judgment corpus.
 
 ```bash
-bash scripts/run_mcp.sh   # sets HK_LAW_LOCAL_ONLY=1 unless you override it
+bash scripts/run_mcp.sh   # HK_LAW_LOCAL_ONLY=0 unless overridden
 ```
 
-In local-only mode:
+In live mode:
 
-- `search_cases` searches the local FTS index only.
-- `get_case` and `get_case_paragraphs` return local text or a structured
-  "not in the local corpus" error; they do not contact HKLII.
-- `verify_citation` verifies against the local corpus only.
-- `note_up` returns cached data only.
-- `corpus_status` and `sync_status` report `local_only`, coverage, last runs,
-  and whether a permission reference is configured (never the value itself).
+- `search_cases` merges local FTS results with HKLII search; a live failure is
+  non-fatal and returns local results plus `live_error`.
+- `get_case` and `get_case_paragraphs` read local text first and fetch a missing
+  case from HKLII.
+- `verify_citation` checks the local corpus, then HKLII.
+- `note_up` and `case_graph` use live note-up data.
+- Bulk sync still refuses without `HK_LAW_CASE_PERMISSION_REF` and an explicit
+  citation list.
 
-Set `HK_LAW_LOCAL_ONLY=0` only after a permitted source is configured. The MCP
-tool parameters still default to local (`live=False`, `allow_live=False`), so a
-client must opt in explicitly.
+To force a strictly local MCP:
+
+```bash
+export HK_LAW_LOCAL_ONLY=1
+# restart the MCP server / Claude Code
+```
+
+In local-only mode, `search_cases` searches local FTS only, missing cases raise
+a structured "not in the local corpus" error, and `verify_citation` / `note_up`
+use cached data only. `corpus_status` and `sync_status` report `local_only`,
+coverage, last runs, and whether a permission reference is configured (never
+the value itself).
+
+Live access is individual, rate-limited research subject to HKLII's terms; it
+is not a substitute for a licensed corpus or for permission for bulk access.
+The repository stores no judgment text.
+
+If you need a **local** judgment copy, import a corpus you are entitled to use
+(`hk-law import-cases`) or obtain written permission for the citation-list
+sync. There is no lawful bulk download of the whole LRS/HKLII database in this
+project.
 
 ## Scheduler
 
@@ -219,10 +243,24 @@ If `systemctl` is unavailable, the installer prints a cron equivalent.
 counts by court, paragraph count, source rows, recent runs, import directory,
 citation file, and permission-configured boolean.
 
+## Coverage report
+
+`hk-law sync-status` and the MCP `sync_status` tool return a `coverage` block:
+current and historical documents/sections by language, judgment counts by
+court, last successful sync age, and a `gaps` list. Typical gaps:
+
+- Traditional Chinese historical versions not ingested.
+- Local judgment corpus below 1,000 cases (not comprehensive).
+- No successful sync for more than 7 days.
+
+Use it to decide whether to run `hk-law sync`, add the Chinese past archives, or
+import a judgment corpus. It reports local coverage only; live HKLII query-time
+coverage is not counted.
+
 ## Known limits
 
-- Judgment coverage equals what you imported. There is no hidden live fallback
-  in local-only mode.
+- Judgment coverage equals what you imported (or query-time HKLII when
+  `HK_LAW_LOCAL_ONLY=0`). There is no hidden live fallback in local-only mode.
 - The HKLII adapter fetches an explicit citation list; it does not discover
   cases. True incremental discovery requires an authorised feed.
 - The LRS adapter is not wired; it needs the permitted URL pattern.

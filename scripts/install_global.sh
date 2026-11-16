@@ -47,7 +47,7 @@ if claude mcp get hk-criminal-law >/dev/null 2>&1; then
 fi
 claude mcp add --scope user hk-criminal-law \
   -e "HK_LAW_DB=$GLOBAL_HOME/hk_law.db" \
-  -e "HK_LAW_LOCAL_ONLY=1" \
+  -e "HK_LAW_LOCAL_ONLY=0" \
   -- "$GLOBAL_HOME/venv/bin/python" -m hk_criminal_law_mcp.server
 
 echo

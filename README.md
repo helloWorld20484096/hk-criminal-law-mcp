@@ -17,11 +17,13 @@ Python 3.11+ · Apache-2.0 code · CC BY 4.0 skills/docs · v0.2.0
 > [!IMPORTANT]
 > **Public repository — no judgment text and no permission claim.** This
 > repository ships **no judgment corpus and no LRS/HKLII crawler**. The author
-> does **not** claim permission from the Judiciary or HKLII. The default MCP is
-> local-only. The HKLII adapter refuses to run without
-> `HK_LAW_CASE_PERMISSION_REF` and an explicit citation list; do not enable it
-> without written permission. For public use, import a judgment corpus you are
-> entitled to use. See [Fully local pipeline](docs/full-local-pipeline.md).
+> does **not** claim permission from the Judiciary or HKLII. The default MCP
+> uses **live HKLII query-time access** for case search/read so results are
+> current; set `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. Live access is
+> individual, rate-limited research and remains subject to HKLII's terms; the
+> bulk citation sync refuses to run without `HK_LAW_CASE_PERMISSION_REF` and an
+> explicit citation list. No judgment text is stored in or distributed by this
+> repository. See [Fully local pipeline](docs/full-local-pipeline.md).
 
 **Start here:** [Quick start](#quick-start) ·
 [Use with Claude Code](#use-with-claude-code) · [CLI](#use-from-the-cli) ·
@@ -74,11 +76,11 @@ English historical versions / 851,431 sections** (1997–2026); see
 | Local corpus | SQLite at `data/hk_law.db`: current legislation + FTS, historical legislation, locally imported judgments + FTS |
 | Local sync | `hk-law sync`: DATA.GOV.HK legislation updates + authorised judgment imports; permission-gated HKLII citation fetch |
 | Interfaces | `hk-criminal-law` MCP server (stdio) and `hk-law` CLI |
-| Live retrieval | Opt-in only: HKLII JSON endpoints for an explicit, permitted citation list; results cached locally |
+| Live retrieval | Default for case queries: HKLII JSON endpoints; opt out with `HK_LAW_LOCAL_ONLY=1`; bulk sync permission-gated |
 
-The MCP server has no cloud dependency. Network access is only needed for an
-explicit `hk-law sync` or a permitted live citation fetch. The project launcher
-sets `HK_LAW_LOCAL_ONLY=1` by default.
+The legislation corpus is local. Case search/read uses live HKLII by default so
+results are current; set `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. No
+judgment text is stored in or distributed by the repository.
 
 For module-level detail, see [docs/architecture.md](docs/architecture.md).
 
@@ -175,10 +177,11 @@ These commands ingest into the database named by `HK_LAW_DB`. Coverage and
 selection rules are in
 [docs/coverage.md#historical-legislation](docs/coverage.md#historical-legislation).
 
-## Fully local pipeline
+## Corpus sync and live case access
 
-The server is local-first. Keep it current with an explicit sync; do not give
-the MCP a live database dependency.
+Legislation is local and auto-updated from DATA.GOV.HK. Case search/read
+defaults to **live HKLII query-time access** so results are current; set
+`HK_LAW_LOCAL_ONLY=1` for a strictly local MCP.
 
 ```bash
 export HK_LAW_DB="$PWD/data/hk_law.db"
@@ -197,11 +200,14 @@ export HK_LAW_DB="$PWD/data/hk_law.db"
 bash scripts/install_sync_timer.sh
 ```
 
-The MCP launcher exports `HK_LAW_LOCAL_ONLY=1`; `search_cases` and `get_case`
-read SQLite only. A permission-gated HKLII citation list is available through
-`HK_LAW_CASE_PERMISSION_REF` + `HK_LAW_CASE_CITATIONS`, but there is **no
-built-in LRS/HKLII crawler** — both sources prohibit automated harvesting
-without permission, and their `robots.txt` files disallow the relevant paths.
+The MCP launcher defaults to live HKLII for `search_cases`, `get_case`,
+`verify_citation`, `note_up`, and `case_graph` (`HK_LAW_LOCAL_ONLY=0`), so
+results reflect HKLII's current database. Set `HK_LAW_LOCAL_ONLY=1` before
+launching for a strictly local MCP; local results and the coverage report still
+work. Bulk sync still requires a permission reference and an explicit citation
+list. There is **no built-in LRS/HKLII crawler** — both sources prohibit
+automated harvesting without permission, and their `robots.txt` files disallow
+the relevant paths.
 
 Full setup, import schemas, state tables, and the permission boundary:
 [docs/full-local-pipeline.md](docs/full-local-pipeline.md) and
@@ -376,7 +382,7 @@ If you are not sure where to start:
 
 | Tool | Purpose |
 |---|---|
-| `corpus_status` | Counts, coverage, local-only mode, and last ingest/fetch times |
+| `corpus_status` | Counts, coverage, live/local mode, and last ingest/fetch times |
 | `sync_status` | Coverage by court, recent sync runs, source provenance, and whether a permission reference is configured |
 
 Neither tool returns the permission value itself.
@@ -423,13 +429,14 @@ See [skills/README.md](skills/README.md) for installation and editing notes.
 - **Legislation:** Hong Kong e-Legislation current-version XML, published by
   the Department of Justice on [DATA.GOV.HK](https://data.gov.hk/en-data/dataset/hk-doj-hkel-legislation-current).
   Free reuse with attribution under the DATA.GOV.HK terms.
-- **Judgments:** the default MCP is local-only. Judgment text is imported only
-  from an authorised corpus, or fetched through a permission-gated citation
-  list. The Judiciary LRS permits downloading for private study and research;
-  commercial reuse requires written permission. The LRS `robots.txt` is
-  `Disallow: /` and HKLII's is `Disallow: /api`; this project does not crawl
-  either source. It does not redistribute judgment text or a prebuilt judgment
-  database.
+- **Judgments:** the default MCP uses live HKLII query-time access for case
+  search/read; it stores no judgment text in the repository. Judgment text is
+  imported only from an authorised corpus, or fetched through a
+  permission-gated citation list. The Judiciary LRS permits downloading for
+  private study and research; commercial reuse requires written permission.
+  The LRS `robots.txt` is `Disallow: /` and HKLII's is `Disallow: /api`; this
+  project does not crawl either source. It does not redistribute judgment text
+  or a prebuilt judgment database.
 - **No warranty:** the HKLII JSON endpoints are undocumented and may change.
 
 Code is Apache-2.0. Skills and documentation are CC BY 4.0. Downloaded data is
@@ -460,12 +467,13 @@ is designed to catch, the verification controls, and the audit procedure.
   the official Past Version archives to be downloaded and ingested; coverage
   depends on which ranges/languages were ingested. Commencement timelines are
   not reconstructed.
-- Case law coverage depends on the authorised corpus or citation list you
-  import. There is no built-in LRS/HKLII crawler; both sources prohibit
-  automated harvesting without permission, and their `robots.txt` files
-  disallow the relevant paths.
-- HKLII endpoints are unofficial; a change or block is possible. The default
-  MCP is local-only and does not call them.
+- Case law coverage is live HKLII query-time by default; local judgment
+  coverage depends on the authorised corpus or citation list you import. There
+  is no built-in LRS/HKLII crawler; both sources prohibit automated harvesting
+  without permission, and their `robots.txt` files disallow the relevant paths.
+- HKLII endpoints are unofficial; a change or block is possible. A live search
+  failure falls back to local results with a `live_error`; set
+  `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP.
 - Note-up and authority ranking are not a citator of record. Check the
   Judiciary's LRS and the judgment itself.
 - `sentencing_research` extracts penalty language and case leads; it is **not**

@@ -12,7 +12,7 @@ try:  # MCP SDK 1.x
 except ImportError:  # MCP SDK 2.x renamed FastMCP to MCPServer
     from mcp.server.mcpserver import MCPServer as _MCPServer
 
-from .config import DISCLAIMER
+from .config import DISCLAIMER, live_case_default
 from .db import connect, stats
 from .hklii import get_case_paragraphs as _get_case_paragraphs
 from .hklii import get_judgment, note_up as _note_up, search_cases as _search_cases
@@ -37,14 +37,13 @@ from .search import (
 mcp = _MCPServer(
     "hk-criminal-law",
     instructions=(
-        "Hong Kong criminal law and defence research. This server is local-first: "
-        "search_cases and get_case read the local corpus by default; live HKLII "
-        "or LRS retrieval is available only when a permitted source is configured "
-        "and the caller explicitly opts in. Agent protocol: call corpus_status or "
-        "sync_status first; use search_legislation and search_cases for discovery, "
-        "then get_section, statute_history, search_cases, and get_case_paragraphs "
-        "for primary text; run verify_citations over every citation before relying "
-        "on it; label anything unverified [UNVERIFIED]. This server is a retrieval "
+        "Hong Kong criminal law and defence research. Case search/read uses live "
+        "HKLII by default so results are current; set HK_LAW_LOCAL_ONLY=1 for a "
+        "strictly local MCP. Agent protocol: call corpus_status or sync_status "
+        "first; use search_legislation and search_cases for discovery, then "
+        "get_section, statute_history, search_cases, and get_case_paragraphs for "
+        "primary text; run verify_citations over every citation before relying on "
+        "it; label anything unverified [UNVERIFIED]. This server is a retrieval "
         "aid, not a citator of record and not legal advice."
     ),
 )
@@ -179,14 +178,17 @@ def search_cases(
     year_to: int | None = None,
     limit: int = 10,
     lang: str = "en",
-    live: bool = False,
+    live: bool | None = None,
 ) -> dict:
-    """Search locally indexed Hong Kong judgments.
+    """Search Hong Kong judgments.
 
-    Live HKLII search is opt-in (``live=True``) and should be used only when a
-    permitted source is configured. `court` accepts a neutral-citation code
-    such as HKCFA/HKCA/HKCFI/HKDC or a court name.
+    The default follows ``HK_LAW_LOCAL_ONLY``: local-only when set to 1 (the
+    public launcher default), live HKLII search when set to 0. Live search is
+    for query-time coverage and remains subject to HKLII's terms.
+    `court` accepts a neutral-citation code such as HKCFA/HKCA/HKCFI/HKDC.
     """
+    if live is None:
+        live = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -204,17 +206,21 @@ def get_case(
     lang: str = "en",
     paragraphs: list[str] | None = None,
     max_chars: int = 20000,
-    allow_live: bool = False,
+    allow_live: bool | None = None,
 ) -> dict:
-    """Read a Hong Kong judgment from the local corpus.
+    """Read a Hong Kong judgment, local by default.
 
     Args:
         citation: e.g. "[2021] HKCFA 1".
         lang: "en" or "zh-Hant".
         paragraphs: Optional paragraph numbers/ranges, e.g. ["12", "15-17"].
         max_chars: Truncate the returned full text to this many characters.
-        allow_live: Opt in to a permitted live fetch when the case is not local.
+        allow_live: Defaults to ``HK_LAW_LOCAL_ONLY=0`` (live when local-only is
+            off); otherwise a missing case is a coverage gap, not an error to
+            paper over.
     """
+    if allow_live is None:
+        allow_live = live_case_default()
     conn = _db()
     try:
         if paragraphs:
@@ -241,12 +247,14 @@ def get_case_paragraphs(
     citation: str,
     paragraphs: list[str],
     lang: str = "en",
-    allow_live: bool = False,
+    allow_live: bool | None = None,
 ) -> dict:
-    """Return specific paragraphs from the local corpus.
+    """Return specific paragraphs, local by default.
 
-    Set ``allow_live=True`` only when a permitted live source is configured.
+    ``allow_live`` follows ``HK_LAW_LOCAL_ONLY`` just like :func:`get_case`.
     """
+    if allow_live is None:
+        allow_live = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -259,11 +267,16 @@ def get_case_paragraphs(
 
 
 @mcp.tool()
-def note_up(citation: str, force: bool = False, allow_live: bool = False) -> dict:
-    """Return cached note-up data (research aid, not a citator).
+def note_up(
+    citation: str, force: bool = False, allow_live: bool | None = None
+) -> dict:
+    """Return note-up data (research aid, not a citator).
 
-    ``allow_live=True`` opts in to a permitted live note-up request.
+    ``allow_live`` follows ``HK_LAW_LOCAL_ONLY``; the public default uses the
+    cache only.
     """
+    if allow_live is None:
+        allow_live = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -274,12 +287,16 @@ def note_up(citation: str, force: bool = False, allow_live: bool = False) -> dic
 
 
 @mcp.tool()
-def verify_citation(citation: str, lang: str = "en", live: bool = False) -> dict:
-    """Verify a citation against the local corpus.
+def verify_citation(
+    citation: str, lang: str = "en", live: bool | None = None
+) -> dict:
+    """Verify a citation against the corpus.
 
-    Set ``live=True`` only when a permitted live source is configured.
+    ``live`` follows ``HK_LAW_LOCAL_ONLY``; the public default is local.
     Examples: "Cap. 221 s.9J", "section 9J of Cap. 221", "[2021] HKCFA 1".
     """
+    if live is None:
+        live = live_case_default()
     conn = _db()
     try:
         return _ok(_verify_citation(conn, citation, lang=lang, live=live))
@@ -288,12 +305,15 @@ def verify_citation(citation: str, lang: str = "en", live: bool = False) -> dict
 
 
 @mcp.tool()
-def verify_citations(text: str, lang: str = "en", live: bool = False) -> dict:
+def verify_citations(
+    text: str, lang: str = "en", live: bool | None = None
+) -> dict:
     """Extract and verify every citation in a passage.
 
-    Defaults to local verification. Set live=True to fetch uncached judgments
-    from HKLII.
+    ``live`` follows ``HK_LAW_LOCAL_ONLY``; the public default is local.
     """
+    if live is None:
+        live = live_case_default()
     conn = _db()
     try:
         return _ok(_verify_citations(conn, text, lang=lang, live=live))
@@ -307,13 +327,16 @@ def doctrine_research(
     lang: str = "en",
     legislation_limit: int = 5,
     case_limit: int = 5,
-    live_cases: bool = False,
+    live_cases: bool | None = None,
 ) -> dict:
     """Return legislation hits and ranked case leads for a doctrine or issue.
 
-    This is a discovery pack, not a legal answer. Fetch and read the judgments
-    you intend to cite.
+    ``live_cases`` follows ``HK_LAW_LOCAL_ONLY``; the public release can opt
+    into local-only. This is a discovery pack, not a legal answer. Fetch and
+    read the judgments you intend to cite.
     """
+    if live_cases is None:
+        live_cases = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -331,13 +354,16 @@ def sentencing_research(
     section: str,
     lang: str = "en",
     case_limit: int = 5,
-    live_cases: bool = False,
+    live_cases: bool | None = None,
 ) -> dict:
     """Return penalty text and sentencing case leads for an offence.
 
-    Not a sentencing tariff. Extracts penalty language from the provision and
-    searches for sentencing material in the case corpus.
+    ``live_cases`` follows ``HK_LAW_LOCAL_ONLY``. Not a sentencing tariff.
+    Extracts penalty language from the provision and searches for sentencing
+    material in the case corpus.
     """
+    if live_cases is None:
+        live_cases = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -353,12 +379,15 @@ def authority_ranking(
     court: str | None = None,
     limit: int = 10,
     lang: str = "en",
-    live: bool = False,
+    live: bool | None = None,
 ) -> dict:
-    """Rank case results by court level and locally cached note-up data.
+    """Rank case results by court level and note-up data.
 
-    Not a citator of record; check later treatment before relying on a case.
+    ``live`` follows ``HK_LAW_LOCAL_ONLY``. Not a citator of record; check
+    later treatment before relying on a case.
     """
+    if live is None:
+        live = live_case_default()
     conn = _db()
     try:
         return _ok(
@@ -372,9 +401,15 @@ def authority_ranking(
 def case_graph(
     citation: str,
     lang: str = "en",
-    live_note_up: bool = False,
+    live_note_up: bool | None = None,
 ) -> dict:
-    """Return outgoing cited cases and cached incoming note-up citations."""
+    """Return outgoing cited cases and incoming note-up citations.
+
+    ``live_note_up`` follows ``HK_LAW_LOCAL_ONLY``; the public default uses the
+    local cache.
+    """
+    if live_note_up is None:
+        live_note_up = live_case_default()
     conn = _db()
     try:
         return _ok(_case_graph(conn, citation, lang, live_note_up))

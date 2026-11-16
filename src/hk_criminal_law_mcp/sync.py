@@ -760,11 +760,102 @@ def run_sync(
     return result
 
 
+def _coverage(conn: sqlite3.Connection) -> dict:
+    """Summarise what is local, what is missing, and how stale it is."""
+
+    def by_language(table: str) -> dict[str, int]:
+        return {
+            row["language"]: row["n"]
+            for row in conn.execute(
+                f"SELECT language, COUNT(*) AS n FROM {table} GROUP BY language"
+            ).fetchall()
+        }
+
+    current_docs = by_language("legislation_docs")
+    current_sections = by_language("legislation_sections")
+    history_docs = by_language("legislation_history_docs")
+    history_sections = by_language("legislation_history_sections")
+    cases_row = conn.execute(
+        "SELECT COUNT(*) AS cases, COUNT(*) FILTER (WHERE language='en') AS en, "
+        "COUNT(*) FILTER (WHERE language LIKE 'zh%') AS zh FROM cases"
+    ).fetchone()
+    paragraphs = conn.execute("SELECT COUNT(*) FROM case_paragraphs").fetchone()[0]
+    cases_by_court = {
+        row["court_code"]: row["n"]
+        for row in conn.execute(
+            "SELECT court_code, COUNT(*) AS n FROM cases "
+            "WHERE court_code IS NOT NULL GROUP BY court_code ORDER BY n DESC"
+        ).fetchall()
+    }
+    max_current = conn.execute(
+        "SELECT MAX(version_date) FROM legislation_docs"
+    ).fetchone()[0]
+    hist_min, hist_max = conn.execute(
+        "SELECT MIN(version_date), MAX(version_date) FROM legislation_history_docs"
+    ).fetchone()
+    age_row = conn.execute(
+        "SELECT (julianday('now') - julianday(MAX(finished_at))) AS days "
+        "FROM sync_runs WHERE status IN ('ok','partial')"
+    ).fetchone()
+    age_days = age_row["days"] if age_row else None
+
+    gaps: list[str] = []
+    if not current_docs:
+        gaps.append(
+            "Current legislation corpus is empty. Run: hk-law sync --dataset current"
+        )
+    elif not current_docs.get("en") or not current_docs.get("zh-Hant"):
+        gaps.append(
+            "Current legislation is missing English or Traditional Chinese documents."
+        )
+    if not history_sections:
+        gaps.append(
+            "Historical legislation is not ingested. Run: hk-law sync --dataset past"
+        )
+    elif not history_sections.get("zh-Hant"):
+        gaps.append(
+            "Traditional Chinese historical versions are not ingested. Run: "
+            "hk-law sync --dataset past --languages zh-Hant --no-cases"
+        )
+    if (cases_row["cases"] if cases_row else 0) < 1000:
+        gaps.append(
+            "The local judgment corpus is not comprehensive. Import an authorised "
+            "corpus, or set HK_LAW_LOCAL_ONLY=0 for permitted live HKLII access."
+        )
+    if age_days is not None and age_days > 7:
+        gaps.append(
+            f"Last successful sync was {int(age_days)} days ago. Run: hk-law sync"
+        )
+
+    return {
+        "legislation_current": {
+            "documents": current_docs,
+            "sections": current_sections,
+            "latest_version_date": max_current,
+        },
+        "legislation_history": {
+            "documents": history_docs,
+            "sections": history_sections,
+            "date_range": f"{hist_min} .. {hist_max}" if hist_min else None,
+        },
+        "judgments": {
+            "cases": cases_row["cases"] if cases_row else 0,
+            "english_cases": cases_row["en"] if cases_row else 0,
+            "chinese_cases": cases_row["zh"] if cases_row else 0,
+            "paragraphs": paragraphs,
+            "by_court": cases_by_court,
+        },
+        "last_sync_age_days": age_days,
+        "gaps": gaps,
+    }
+
+
 def sync_status(conn: sqlite3.Connection) -> dict:
-    """Return local coverage, sync state, and permission configuration."""
+    """Return local coverage, what is missing, sync state, and permission config."""
     payload = stats(conn)
     payload.update(
         {
+            "coverage": _coverage(conn),
             "local_only": local_only(),
             "permission_configured": bool(case_permission_ref()),
             "case_source": case_source_name(),

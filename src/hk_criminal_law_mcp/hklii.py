@@ -327,11 +327,26 @@ def search_cases(
     lang: str = "en",
     live: bool = False,
 ) -> dict:
-    """Search locally indexed judgments; live HKLII search is opt-in."""
+    """Search local judgments and, by default, the live HKLII database.
+
+    A live failure is non-fatal: local results are returned with `live_error`.
+    """
     local = _search_local(conn, query, court, year_from, year_to, limit, lang)
     live_result = {"source": "disabled", "results": [], "count": 0}
+    live_error = None
     if live:
-        live_result = _search_live(query, court, year_from, year_to, limit, lang, conn)
+        try:
+            live_result = _search_live(
+                query, court, year_from, year_to, limit, lang, conn
+            )
+        except Exception as exc:
+            live_error = str(exc)
+            live_result = {
+                "source": "hklii_error",
+                "results": [],
+                "count": 0,
+                "error": live_error,
+            }
     seen = {item["citation"] for item in local}
     merged = list(local)
     for item in live_result.get("results", []):
@@ -344,6 +359,7 @@ def search_cases(
         "results": merged[: max(1, min(limit, 100))],
         "local_count": len(local),
         "live_source": live_result.get("source"),
+        "live_error": live_error,
         "warning": (
             "Local results only; no live HKLII search was performed. Verify each "
             "citation in the Judiciary's Legal Reference System or the official "

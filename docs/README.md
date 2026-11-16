@@ -25,8 +25,8 @@ that apply to the data.
 
 | Document | Answers |
 |---|---|
-| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how judgments are imported and permission-gated; why the design is local-first. |
-| [Fully local pipeline](full-local-pipeline.md) | Incremental legislation sync, judgment import formats, permission-gated citation sync, MCP local-only mode, and the systemd timer. |
+| [Architecture](architecture.md) | How HKeL XML becomes SQLite sections; how case access uses live HKLII and local imports; why legislation is local. |
+| [Fully local pipeline](full-local-pipeline.md) | Incremental legislation sync, judgment import formats, permission-gated citation sync, MCP live default/local-only opt-out, and the systemd timer. |
 | [Permission request template](permission-request-template.md) | A written request to the Judiciary/HKLII for automated access, with the scope and rate-limit items to settle. |
 | [Public release checklist](public-release.md) | The pre-push audit for judgment text, databases, archives, generated atlas data, and credentials. |
 | [Coverage](coverage.md) | Corpus counts, core criminal Cap. numbers, historical coverage, case-law coverage, and known gaps. |

@@ -97,8 +97,9 @@ the client:
 
 The `sync_cases` function refuses to run without
 `HK_LAW_CASE_PERMISSION_REF` and an explicit citation list. The default MCP
-launcher sets `HK_LAW_LOCAL_ONLY=1`, so no live call happens unless the operator
-deliberately changes that.
+launcher uses live HKLII for case search/read (`HK_LAW_LOCAL_ONLY=0`), subject
+to these terms; set `HK_LAW_LOCAL_ONLY=1` for a strictly local MCP. The
+repository stores no judgment text.
 
 **Attribution:** cite the neutral citation and link to the HKLII or Judiciary
 source. Do not describe HKLII as an official government source.

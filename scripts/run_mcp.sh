@@ -12,8 +12,8 @@ fi
 
 export HK_LAW_DB="${HK_LAW_DB:-$ROOT/data/hk_law.db}"
 export HK_LAW_DATA_DIR="${HK_LAW_DATA_DIR:-$ROOT/data/raw}"
-# Fully local by default. Set HK_LAW_LOCAL_ONLY=0 only after a permitted live
-# source is configured (see docs/full-local-pipeline.md).
-export HK_LAW_LOCAL_ONLY="${HK_LAW_LOCAL_ONLY:-1}"
+# Live HKLII is the default for case search/read so results are current
+# (subject to HKLII terms). Set HK_LAW_LOCAL_ONLY=1 for a local-only MCP.
+export HK_LAW_LOCAL_ONLY="${HK_LAW_LOCAL_ONLY:-0}"
 
 exec "$VENV_PY" -m hk_criminal_law_mcp.server
